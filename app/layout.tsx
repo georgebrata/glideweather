@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
+import { DEFAULT_LOCALE, getTranslations } from "./i18n";
 import "./globals.css";
 
+const defaultText = getTranslations(DEFAULT_LOCALE);
+
 export const metadata: Metadata = {
-  title: "Parapantabil.ro | Verificare meteo de zbor",
-  description:
-    "Consolă meteo în limba română pentru verificarea condițiilor parapantabile.",
+  title: defaultText.meta.title,
+  description: defaultText.meta.description,
   icons: {
     icon: "/parapantabil-logo.png",
     shortcut: "/parapantabil-logo.png",
     apple: "/parapantabil-logo.png",
   },
   openGraph: {
-    title: "Parapantabil.ro | Verificare meteo de zbor",
-    description:
-      "Consolă meteo în limba română pentru verificarea condițiilor parapantabile.",
+    title: defaultText.meta.title,
+    description: defaultText.meta.description,
     images: ["/parapantabil-logo.png"],
   },
 };
@@ -24,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ro" suppressHydrationWarning>
+    <html lang={defaultText.meta.documentLang} suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );
