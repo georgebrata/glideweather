@@ -776,10 +776,10 @@ function LocationSummary({
     >
       <PlaceIcon sx={{ color: "primary.main", fontSize: 20 }} />
       <Box sx={{ minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", noWrap: true }}>
+        <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.92rem" }}>
           {location.name}
         </Typography>
-        <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.78rem", noWrap: true }}>
+        <Typography variant="body2" noWrap sx={{ color: "text.secondary", fontSize: "0.78rem" }}>
           {location.detail || `${location.latitude.toFixed(2)}, ${location.longitude.toFixed(2)}`}
         </Typography>
       </Box>
