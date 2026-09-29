@@ -30,3 +30,7 @@ a {
   background: rgba(97, 244, 222, 0.32);
   color: #ffffff;
 }
+
+html, body {
+  overflow-x: hidden;
+}
