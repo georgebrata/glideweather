@@ -47,3 +47,8 @@ a {
   background: rgba(8, 127, 130, 0.22);
   color: #102033;
 }
+
+html,
+body {
+  overflow-x: hidden;
+}

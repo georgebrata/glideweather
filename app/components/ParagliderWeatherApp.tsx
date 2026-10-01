@@ -22,6 +22,10 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import WaterDropIcon from "@mui/icons-material/WaterDrop";
 import WbSunnyIcon from "@mui/icons-material/WbSunny";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CompassCalibrationIcon from "@mui/icons-material/CompassCalibration";
+import MapIcon from "@mui/icons-material/Map";
 import {
   Alert,
   Autocomplete,
@@ -157,6 +161,15 @@ const defaultSources = [
 ];
 
 const LOGO_SRC = "/parapantabil-logo.png";
+
+const POPULAR_SPOTS: LocationChoice[] = [
+  { id: "spot-bunloc", name: "Bunloc", detail: "Săcele, Brașov", latitude: 45.5883, longitude: 25.6421, source: "search" },
+  { id: "spot-clopotiva", name: "Clopotiva", detail: "Retezat, Hunedoara", latitude: 45.4742, longitude: 22.8053, source: "search" },
+  { id: "spot-postavarul", name: "Postăvarul", detail: "Poiana Brașov", latitude: 45.5681, longitude: 25.5632, source: "search" },
+  { id: "spot-sirnea", name: "Șirnea", detail: "Piatra Craiului, Brașov", latitude: 45.4672, longitude: 25.2501, source: "search" },
+  { id: "spot-pralea", name: "Pralea", detail: "Căiuți, Bacău", latitude: 46.1681, longitude: 26.8382, source: "search" },
+  { id: "spot-rimetea", name: "Rimetea", detail: "Piatra Secuiului, Alba", latitude: 46.4523, longitude: 23.5674, source: "search" },
+];
 
 type StatusTone = {
   color: string;
@@ -508,9 +521,10 @@ function ParagliderWeatherDashboard({
             toggleThemeMode={toggleThemeMode}
           />
 
-          {location && locationNotice ? (
+          {locationNotice ? (
             <Alert
               severity="warning"
+              onClose={() => setLocationNotice(null)}
               sx={alertSx("warning")}
             >
               {locationNotice}
@@ -530,6 +544,11 @@ function ParagliderWeatherDashboard({
               locating={locating}
               notice={locationNotice}
               onLocate={requestLocation}
+              onSelectSpot={(spot) => {
+                setLocation(spot);
+                setLocationNotice(null);
+                setActiveTab(0);
+              }}
             />
           )}
         </Stack>
@@ -661,6 +680,76 @@ function HeaderPanel({
               Consolă meteo pentru piloți parapantă: vânt, rafale, vizibilitate, instabilitate și fereastră
               de lansare citite ca un singur semnal.
             </Typography>
+          </Box>
+
+          {/* Feature explanation cards */}
+          <Box
+            sx={{
+              display: "grid",
+              gap: 1,
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
+            }}
+          >
+            <FeatureExplanationCard
+              icon={<CheckCircleIcon sx={{ color: "success.main", fontSize: 18 }} />}
+              title="1. Verdict & Scor (0–100)"
+              description="Sintetizează vântul, rafalele, instabilitatea și vizibilitatea într-o decizie clară."
+            />
+            <FeatureExplanationCard
+              icon={<AccessTimeIcon sx={{ color: "primary.main", fontSize: 18 }} />}
+              title="2. Ferestre Optime de Zbor"
+              description="Scanează oră cu oră evoluția zilei și recomandă intervalele sigure de lansare."
+            />
+            <FeatureExplanationCard
+              icon={<CompassCalibrationIcon sx={{ color: "secondary.main", fontSize: 18 }} />}
+              title="3. Telemetrie Vânt & Turbulență"
+              description="Calculează vântul la 10m, ecartul rafalelor, indicele CAPE și calitatea aerului."
+            />
+            <FeatureExplanationCard
+              icon={<MapIcon sx={{ color: "primary.main", fontSize: 18 }} />}
+              title="4. Căutare & GPS Liber"
+              description="Afișează condițiile pentru orice zonă de decolare sau localitate din lume."
+            />
+          </Box>
+
+          {/* Popular Locations Shortcuts */}
+          <Box>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: { xs: "flex-start", sm: "center" }, mb: 0.75 }}>
+              <Typography variant="body2" sx={(theme) => ({ color: theme.palette.mode === "light" ? "#075c63" : "#bfefff", fontWeight: 700, whiteSpace: "nowrap" })}>
+                Zone populare de decolare:
+              </Typography>
+            </Stack>
+            <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }}>
+              {POPULAR_SPOTS.map((spot) => (
+                <Chip
+                  key={spot.id}
+                  label={spot.name}
+                  onClick={() => {
+                    setLocation(spot);
+                    setLocationNotice(null);
+                    setActiveTab(0);
+                  }}
+                  clickable
+                  size="small"
+                  sx={(theme) => ({
+                    background: location?.id === spot.id
+                      ? alpha(theme.palette.primary.main, 0.22)
+                      : alpha(theme.palette.primary.main, 0.06),
+                    borderColor: location?.id === spot.id
+                      ? theme.palette.primary.main
+                      : alpha(theme.palette.primary.main, 0.22),
+                    color: location?.id === spot.id
+                      ? theme.palette.mode === "light" ? "#021115" : "#ffffff"
+                      : theme.palette.text.primary,
+                    fontWeight: 700,
+                    "&:hover": {
+                      background: alpha(theme.palette.primary.main, 0.18),
+                      borderColor: theme.palette.primary.main,
+                    },
+                  })}
+                />
+              ))}
+            </Stack>
           </Box>
           <Stack
             direction={{ xs: "column", sm: "row" }}
@@ -967,10 +1056,12 @@ function EmptyLocationPanel({
   locating,
   notice,
   onLocate,
+  onSelectSpot,
 }: {
   locating: boolean;
   notice: string | null;
   onLocate: () => void;
+  onSelectSpot: (spot: LocationChoice) => void;
 }) {
   return (
     <PanelShell sx={{ p: { xs: 2, md: 3 }, minHeight: { xs: 620, md: 560 } }}>
@@ -987,19 +1078,19 @@ function EmptyLocationPanel({
         <Stack spacing={2.1} sx={{ order: { xs: 2, md: 1 }, maxWidth: 560 }}>
           <Chip
             icon={<LogoMark size={18} />}
-            label="sistem în așteptare"
+            label="sistem pregătit pentru analiză"
             sx={(theme) => ({
               alignSelf: "flex-start",
               color: theme.palette.mode === "light" ? "#075c63" : "#bffcff",
             })}
           />
           <Box>
-            <Typography variant="h2" component="h2" sx={{ fontSize: "2rem", overflowWrap: "anywhere" }}>
-              Calibrează zona de zbor
+            <Typography variant="h2" component="h2" sx={{ fontSize: { xs: "1.6rem", sm: "2rem" }, overflowWrap: "anywhere" }}>
+              Calibrează zona de decolare
             </Typography>
-            <Typography sx={{ mt: 1, color: "text.secondary" }}>
-              Introdu o localitate, o zonă de decolare sau activează poziția. Consola va sintetiza
-              condițiile într-un verdict parapantabil, cu riscurile critice la vedere.
+            <Typography sx={{ mt: 1, color: "text.secondary", fontSize: "0.98rem" }}>
+              Alege una dintre zonele populare de mai jos, caută o localitate sau activează poziția ta GPS.
+              Consola va genera instantaneu verdictul meteo pentru parapantă, semnalând riscurile critice.
             </Typography>
           </Box>
 
@@ -1009,16 +1100,47 @@ function EmptyLocationPanel({
             </Alert>
           ) : null}
 
-          <Box
-            sx={{
-              display: "grid",
-              gap: 1,
-              gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0, 1fr))" },
-            }}
-          >
-            <SignalMini icon={<AirIcon />} label="Vânt" value="necalibrat" />
-            <SignalMini icon={<SpeedIcon />} label="Rafale" value="necalibrat" />
-            <SignalMini icon={<VisibilityIcon />} label="Vizibilitate" value="necalibrat" />
+          {/* Popular spots quick-select */}
+          <Box>
+            <Typography variant="body2" sx={(theme) => ({ color: theme.palette.mode === "light" ? "#075c63" : "#bfefff", fontWeight: 800, mb: 1 })}>
+              Lansare rapidă — Zone frecventate din România:
+            </Typography>
+            <Box
+              sx={{
+                display: "grid",
+                gap: 1,
+                gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)" },
+              }}
+            >
+              {POPULAR_SPOTS.map((spot) => (
+                <Button
+                  key={spot.id}
+                  variant="outlined"
+                  onClick={() => onSelectSpot(spot)}
+                  sx={(theme) => ({
+                    justifyContent: "flex-start",
+                    textAlign: "left",
+                    p: 1.25,
+                    borderColor: alpha(theme.palette.primary.main, 0.28),
+                    background: alpha(theme.palette.primary.main, 0.04),
+                    color: theme.palette.text.primary,
+                    "&:hover": {
+                      borderColor: theme.palette.primary.main,
+                      background: alpha(theme.palette.primary.main, 0.12),
+                    },
+                  })}
+                >
+                  <Box>
+                    <Typography sx={{ fontWeight: 800, fontSize: "0.88rem" }}>
+                      {spot.name}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.74rem" }}>
+                      {spot.detail}
+                    </Typography>
+                  </Box>
+                </Button>
+              ))}
+            </Box>
           </Box>
 
           <Stack
@@ -1036,12 +1158,13 @@ function EmptyLocationPanel({
               sx={{
                 color: "#041116",
                 background: "linear-gradient(135deg, #61f4de, #4dffa5)",
+                py: 1.2,
               }}
             >
-              Detectează poziția
+              Detectează poziția GPS
             </Button>
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Coordonatele sunt folosite doar pentru prognoza meteo.
+            <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.82rem" }}>
+              Coordonatele sunt folosite exclusiv pentru generarea prognozei meteo.
             </Typography>
           </Stack>
         </Stack>
@@ -1063,20 +1186,84 @@ function LocationSummary({
 }) {
   if (!location) {
     return (
-      <Chip
-        icon={<PlaceIcon />}
-        label="Coordonate necalibrate"
-        sx={{ justifyContent: "flex-start", maxWidth: "100%" }}
-      />
+      <Box
+        sx={(theme) => ({
+          px: 1.5,
+          py: 1,
+          borderRadius: 2,
+          border: `1px dashed ${alpha(theme.palette.primary.main, 0.28)}`,
+          background: alpha(theme.palette.primary.main, 0.04),
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+        })}
+      >
+        <PlaceIcon sx={{ color: "text.secondary", fontSize: 20 }} />
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          Nicio zonă selectată
+        </Typography>
+      </Box>
     );
   }
 
   return (
-    <Chip
-      icon={<PlaceIcon />}
-      label={[location.name, snapshot?.timezone ?? location.detail].filter(Boolean).join(" / ")}
-      sx={{ justifyContent: "flex-start", maxWidth: "100%" }}
-    />
+    <Box
+      sx={(theme) => ({
+        px: 1.5,
+        py: 0.8,
+        borderRadius: 2,
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.36)}`,
+        background: alpha(theme.palette.primary.main, 0.08),
+        display: "flex",
+        alignItems: "center",
+        gap: 1,
+        minWidth: 0,
+      })}
+    >
+      <PlaceIcon sx={{ color: "primary.main", fontSize: 20 }} />
+      <Box sx={{ minWidth: 0 }}>
+        <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.92rem" }}>
+          {location.name}
+        </Typography>
+        <Typography noWrap variant="body2" sx={{ color: "text.secondary", fontSize: "0.78rem" }}>
+          {location.detail ?? snapshot?.timezone ?? `${location.latitude.toFixed(2)}, ${location.longitude.toFixed(2)}`}
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
+function FeatureExplanationCard({
+  description,
+  icon,
+  title,
+}: {
+  description: string;
+  icon: ReactNode;
+  title: string;
+}) {
+  return (
+    <Box
+      sx={(theme) => ({
+        p: 1.1,
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.14)}`,
+        borderRadius: 2,
+        background: alpha(theme.palette.primary.main, 0.04),
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+      })}
+    >
+      <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", mb: 0.5 }}>
+        <Box sx={{ display: "grid", placeItems: "center" }}>{icon}</Box>
+        <Typography sx={{ fontWeight: 800, fontSize: "0.85rem" }}>
+          {title}
+        </Typography>
+      </Stack>
+      <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.78rem", lineHeight: 1.45 }}>
+        {description}
+      </Typography>
+    </Box>
   );
 }
 

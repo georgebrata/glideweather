@@ -183,7 +183,7 @@ async function requestJson<T>(url: string, schema: z.ZodSchema<T>): Promise<T> {
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(`Serviciul meteo a raspuns cu status ${response.status}`);
+    throw new Error(`Serviciul meteo a răspuns cu status ${response.status}`);
   }
 
   return schema.parse(await response.json());
@@ -419,9 +419,9 @@ export async function fetchDayForecast(
     sample: null,
     verdict: {
       status: "no-go" as const,
-      title: "Nu exista fereastra de lumina",
+      title: "Nu există fereastră de lumină",
       score: 0,
-      reasons: ["Prognoza nu a returnat ore cu lumina naturala pentru data selectata."],
+      reasons: ["Prognoza nu a returnat ore cu lumină naturală pentru data selectată."],
       cautions: [],
     },
   };
