@@ -63,7 +63,7 @@ function DashboardRoot() {
   return (
     <FlightWindowDashboard
       authLoaded={authLoaded}
-      isSignedIn={isSignedIn}
+      isSignedIn={isSignedIn ?? false}
       user={user}
       locale={locale}
       setLocale={setLocale}
@@ -273,8 +273,8 @@ function FlightWindowDashboard({
           </Box>
         </Box>
 
-        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1} sx={{ pt: 0.5 }}>
-          <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ pt: 0.5, justifyContent: "space-between" }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
             <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "primary.main" }} />
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
               {modelUpdatedLabel ?? t.flightWindow.footerAttribution}

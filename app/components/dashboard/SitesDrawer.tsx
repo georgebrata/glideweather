@@ -24,16 +24,18 @@ export const SitesDrawer = ({
       anchor="left"
       open={open}
       onClose={onClose}
-      PaperProps={{
-        sx: {
-          width: { xs: "100%", sm: 360 },
-          bgcolor: "background.default",
-          borderRight: "1px solid var(--border-flight)",
+      slotProps={{
+        paper: {
+          sx: {
+            width: { xs: "100%", sm: 360 },
+            bgcolor: "background.default",
+            borderRight: "1px solid var(--border-flight)",
+          },
         },
       }}
     >
       <Stack spacing={2} sx={{ p: 2.5 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
+        <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
           <Typography variant="h2">{t.console.romaniaSites}</Typography>
           <IconButton aria-label={t.language.close} onClick={onClose}>
             <CloseIcon />

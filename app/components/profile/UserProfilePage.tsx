@@ -106,36 +106,36 @@ const UserProfileForm = ({ user }: { user: ProfileUser }) => {
           openText={t.language.open}
           options={searchQuery.data ?? []}
           value={defaultLocation}
-          renderInput={(params) => {
-            const inputSlot = params.InputProps ?? {};
-            return (
+          renderInput={(params) => (
               <TextField
                 {...params}
                 placeholder={t.flightWindow.searchPlaceholder}
-                inputProps={{
-                  ...params.inputProps,
-                  "aria-label": t.profile.defaultLocation,
-                }}
-                InputProps={{
-                  ...inputSlot,
-                  startAdornment: (
-                    <>
-                      <InputAdornment position="start">
-                        <SearchIcon sx={{ color: "text.secondary", fontSize: 20 }} />
-                      </InputAdornment>
-                      {inputSlot.startAdornment}
-                    </>
-                  ),
-                  endAdornment: (
-                    <>
-                      {searchQuery.isFetching ? <CircularProgress color="inherit" size={18} /> : null}
-                      {inputSlot.endAdornment}
-                    </>
-                  ),
+                slotProps={{
+                  ...params.slotProps,
+                  htmlInput: {
+                    ...params.slotProps.htmlInput,
+                    "aria-label": t.profile.defaultLocation,
+                  },
+                  input: {
+                    ...params.slotProps.input,
+                    startAdornment: (
+                      <>
+                        <InputAdornment position="start">
+                          <SearchIcon sx={{ color: "text.secondary", fontSize: 20 }} />
+                        </InputAdornment>
+                        {params.slotProps.input.startAdornment}
+                      </>
+                    ),
+                    endAdornment: (
+                      <>
+                        {searchQuery.isFetching ? <CircularProgress color="inherit" size={18} /> : null}
+                        {params.slotProps.input.endAdornment}
+                      </>
+                    ),
+                  },
                 }}
               />
-            );
-          }}
+          )}
         />
         {defaultLocation ? (
           <Stack spacing={0.5} sx={{ alignItems: "flex-start" }}>
@@ -165,7 +165,7 @@ const UserProfileForm = ({ user }: { user: ProfileUser }) => {
 
       <TextField label={t.profile.flyingDevice} value={t.profile.comingSoon} disabled fullWidth helperText={t.profile.comingSoon} />
 
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ alignItems: { sm: "center" } }}>
         <Button variant="contained" onClick={() => void handleSave()} disabled={saveState === "saving"}>
           {saveState === "saving" ? t.profile.saving : t.profile.save}
         </Button>

@@ -111,27 +111,29 @@ export const AppHeader = ({
             openText={t.language.open}
             options={searchData}
             renderInput={(params) => {
-              const inputSlot = params.InputProps ?? {};
               return (
               <TextField
                 {...params}
                 placeholder={t.flightWindow.searchPlaceholder}
-                InputProps={{
-                  ...inputSlot,
-                  startAdornment: (
-                    <>
-                      <InputAdornment position="start">
-                        <SearchIcon sx={{ color: "text.secondary", fontSize: 20 }} />
-                      </InputAdornment>
-                      {inputSlot.startAdornment}
-                    </>
-                  ),
-                  endAdornment: (
-                    <>
-                      {searchFetching ? <CircularProgress color="inherit" size={18} /> : null}
-                      {inputSlot.endAdornment}
-                    </>
-                  ),
+                slotProps={{
+                  ...params.slotProps,
+                  input: {
+                    ...params.slotProps.input,
+                    startAdornment: (
+                      <>
+                        <InputAdornment position="start">
+                          <SearchIcon sx={{ color: "text.secondary", fontSize: 20 }} />
+                        </InputAdornment>
+                        {params.slotProps.input.startAdornment}
+                      </>
+                    ),
+                    endAdornment: (
+                      <>
+                        {searchFetching ? <CircularProgress color="inherit" size={18} /> : null}
+                        {params.slotProps.input.endAdornment}
+                      </>
+                    ),
+                  },
                 }}
                 sx={{
                   "& .MuiOutlinedInput-root": {

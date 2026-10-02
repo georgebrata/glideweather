@@ -327,7 +327,7 @@ const ExtraMetrics = ({ sample, themeMode }: { sample: WeatherSample; themeMode:
 
 const Fact = ({ icon, label, value }: { icon?: ReactNode; label: string; value: string }) => (
   <Box>
-    <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "text.secondary" }}>
+    <Stack direction="row" spacing={0.5} sx={{ color: "text.secondary", alignItems: "center" }}>
       {icon}
       <Typography variant="body2">{label}</Typography>
     </Stack>
@@ -336,7 +336,7 @@ const Fact = ({ icon, label, value }: { icon?: ReactNode; label: string; value: 
 );
 
 const RiskLine = ({ children, color }: { children: ReactNode; color: string }) => (
-  <Stack direction="row" spacing={0.75} alignItems="flex-start">
+  <Stack direction="row" spacing={0.75} sx={{ alignItems: "flex-start" }}>
     <WarningAmberIcon sx={{ color, fontSize: 18, mt: "2px" }} />
     <Typography variant="body2">{children}</Typography>
   </Stack>

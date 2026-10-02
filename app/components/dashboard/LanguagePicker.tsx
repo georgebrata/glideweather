@@ -38,25 +38,25 @@ export const LanguagePicker = ({
         onInputChange={() => undefined}
         openText={t.language.open}
         options={LOCALE_OPTIONS}
-        renderInput={(params) => {
-          const inputSlot = params.InputProps ?? {};
-          return (
+        renderInput={(params) => (
             <TextField
               {...params}
               aria-label={t.language.label}
               size="small"
-              InputProps={{
-                ...inputSlot,
-                startAdornment: (
-                  <>
-                    <LanguageIcon sx={{ color: "primary.main", fontSize: 18, mr: 0.5 }} />
-                    {inputSlot.startAdornment}
-                  </>
-                ),
+              slotProps={{
+                ...params.slotProps,
+                input: {
+                  ...params.slotProps.input,
+                  startAdornment: (
+                    <>
+                      <LanguageIcon sx={{ color: "primary.main", fontSize: 18, mr: 0.5 }} />
+                      {params.slotProps.input.startAdornment}
+                    </>
+                  ),
+                },
               }}
             />
-          );
-        }}
+        )}
         renderOption={(props, option) => (
           <Box component="li" {...props} key={option.code}>
             <Stack spacing={0.15} sx={{ minWidth: 0 }}>

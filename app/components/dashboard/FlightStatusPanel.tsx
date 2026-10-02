@@ -71,14 +71,14 @@ export const FlightStatusPanel = ({
 
   return (
     <Stack spacing={2.25} sx={{ p: { xs: 2, md: 2.5 }, height: "100%" }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center">
+      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
         <Typography
           variant="body2"
           sx={{ letterSpacing: "0.12em", fontSize: "0.68rem", color: "text.secondary", fontWeight: 600 }}
         >
           {t.flightWindow.flightStatus}
         </Typography>
-        <Stack direction="row" spacing={0.75} alignItems="center">
+        <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
           <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "primary.main" }} />
           <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.68rem", letterSpacing: "0.08em" }}>
             {minutesSinceUpdate(sample.time, locale)}
@@ -86,7 +86,7 @@ export const FlightStatusPanel = ({
         </Stack>
       </Stack>
 
-      <Stack direction="row" spacing={2} alignItems="center">
+      <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
         <Box
           aria-label={t.common.scoreOutOf100(verdict.score)}
           role="img"
@@ -124,7 +124,7 @@ export const FlightStatusPanel = ({
       </Stack>
 
       <Box>
-        <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.75 }}>
+        <Stack direction="row" sx={{ mb: 0.75, justifyContent: "space-between" }}>
           <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.72rem", letterSpacing: "0.1em" }}>
             {t.flightWindow.flightConfidence}
           </Typography>
@@ -176,7 +176,7 @@ export const FlightStatusPanel = ({
       </Box>
 
       <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.25 }}>
+        <Stack direction="row" sx={{ mb: 1.25, justifyContent: "space-between", alignItems: "center" }}>
           <Typography variant="body2" sx={{ letterSpacing: "0.12em", fontSize: "0.68rem", color: "text.secondary", fontWeight: 600 }}>
             {t.flightWindow.next6Hours}
           </Typography>
@@ -216,7 +216,7 @@ export const FlightStatusPanel = ({
             const barHeight = slot.windMs === null ? 8 : 24 + (slot.windMs / maxWindMs) * 72;
             const barColor = slot.barTone === "ideal" ? tokens.accent : tokens.amber;
             return (
-              <Stack key={slot.sample.time} spacing={0.75} alignItems="center" sx={{ height: "100%" }}>
+              <Stack key={slot.sample.time} spacing={0.75} sx={{ height: "100%", alignItems: "center" }}>
                 <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>
                   {slot.temperature === null ? "—" : `${Math.round(slot.temperature)}°`}
                 </Typography>
@@ -273,7 +273,7 @@ const MetricCell = ({
       minWidth: 0,
     }}
   >
-    <Stack direction="row" spacing={0.5} alignItems="center" sx={{ color: "text.secondary" }}>
+    <Stack direction="row" spacing={0.5} sx={{ color: "text.secondary", alignItems: "center" }}>
       {icon}
       <Typography variant="body2" sx={{ fontSize: "0.65rem", letterSpacing: "0.1em" }}>
         {label}
@@ -287,7 +287,7 @@ const MetricCell = ({
 );
 
 const LegendDot = ({ color, label }: { color: string; label: string }) => (
-  <Stack direction="row" spacing={0.75} alignItems="center">
+  <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
     <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: color }} />
     <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>
       {label}
