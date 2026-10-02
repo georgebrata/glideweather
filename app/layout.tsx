@@ -1,7 +1,15 @@
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import { MARK_SRC, PRODUCT_NAME, resolveSiteOrigin } from "./brand";
 import { DEFAULT_LOCALE, getTranslations } from "./i18n";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin", "latin-ext"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 const defaultText = getTranslations(DEFAULT_LOCALE);
 const siteOrigin = resolveSiteOrigin();
@@ -40,7 +48,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang={defaultText.meta.documentLang} suppressHydrationWarning>
-      <body>{children}</body>
+      <body className={inter.variable}>
+        <ClerkProvider>
+          {children}
+        </ClerkProvider>
+      </body>
     </html>
   );
 }
