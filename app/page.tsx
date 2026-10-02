@@ -1,5 +1,5 @@
-import ParagliderWeatherApp from "./components/ParagliderWeatherApp";
+import GlideWeatherApp from "./components/GlideWeatherApp";
 
 export default function Home() {
-  return <ParagliderWeatherApp />;
+  return <GlideWeatherApp />;
 }

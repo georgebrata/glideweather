@@ -3,14 +3,14 @@ export const en = {
     documentLang: "en",
     localeName: "English",
     nativeName: "English",
-    title: "Parapantabil.ro | Paragliding weather check",
+    title: "GlideWeather · Flight weather",
     description:
-      "Weather console for checking paragliding conditions before launch.",
+      "Launch verdict for paragliding: wind, gusts, visibility, and instability.",
   },
   common: {
     notAvailable: "n/a",
     scoreDenominator: "/100",
-    scoreOutOf100: (score: number) => `Paragliding score ${score} out of 100`,
+    scoreOutOf100: (score: number) => `GlideWeather score ${score} out of 100`,
   },
   language: {
     label: "Language",
@@ -18,7 +18,7 @@ export const en = {
     clear: "Clear",
     close: "Close",
     open: "Open",
-    noOptions: "No European country found",
+    noOptions: "No country found",
   },
   theme: {
     enableLight: "Enable light theme",
@@ -50,8 +50,8 @@ export const en = {
     myPosition: "My position",
   },
   header: {
-    productChip: "Parapantabil OS",
-    headline: "Parapantabil?",
+    productChip: "GlideWeather",
+    headline: "GlideWeather",
     intro:
       "Weather console for paraglider pilots: wind, gusts, visibility, instability, and launch window read as one signal.",
     refreshTooltip: "Recalibrate weather data",
@@ -149,10 +149,10 @@ export const en = {
   },
   weather: {
     titles: {
-      good: "Parapantabil",
+      good: "You can fly",
       marginal: "Marginal",
-      noGo: "Not parapantabil",
-      noLight: "No daylight window",
+      noGo: "Do not fly",
+      noLight: "No daylight",
     },
     reasons: {
       noLightAtArea: "There is no natural light at the flight area.",
@@ -221,6 +221,25 @@ export const en = {
     sw: "SW",
     w: "W",
     nw: "NW",
+  },
+  console: {
+    noPlace: "No area selected",
+    update: "Update",
+    romaniaSites: "Sites in Romania",
+    windowsError: (message: string) =>
+      `Today's launch windows could not be loaded: ${message}`,
+    moreData: "More data",
+    rain: "Rain",
+    spread: "Spread",
+    cape: "CAPE",
+    humidity: "Humidity",
+    uv: "UV",
+    aqi: "AQI",
+    pm25: "PM2.5",
+    windowsTitle: "Launch windows",
+    windowsSubtitle: "Daylight hours sorted by score",
+    footer:
+      "GlideWeather · Open-Meteo data · Decision aid, not flight authorization.",
   },
 };
 

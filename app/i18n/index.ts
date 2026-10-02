@@ -8,20 +8,8 @@ const dictionaryLocales = {
 
 type DictionaryLocale = keyof typeof dictionaryLocales;
 
-export type EuropeanLocaleOption = {
-  code: string;
-  countryCode: string;
-  countryName: string;
-  nativeCountryName: string;
-  languageName: string;
-  nativeLanguageName: string;
-  intlLocale: string;
-  dictionaryLocale: DictionaryLocale;
-  openMeteoLanguage: string;
-};
-
-const option = (
-  code: string,
+const option = <const TCode extends string>(
+  code: TCode,
   countryCode: string,
   countryName: string,
   nativeCountryName: string,
@@ -29,7 +17,7 @@ const option = (
   nativeLanguageName: string,
   dictionaryLocale: DictionaryLocale = "en-GB",
   openMeteoLanguage = "en",
-): EuropeanLocaleOption => ({
+) => ({
   code,
   countryCode,
   countryName,
@@ -41,7 +29,7 @@ const option = (
   openMeteoLanguage,
 });
 
-export const EUROPEAN_LOCALE_OPTIONS = [
+export const LOCALE_OPTIONS = [
   option("sq-AL", "AL", "Albania", "Shqipëria", "Albanian", "Shqip"),
   option("ca-AD", "AD", "Andorra", "Andorra", "Catalan", "Català", "en-GB", "ca"),
   option("hy-AM", "AM", "Armenia", "Հայաստան", "Armenian", "Հայերեն"),
@@ -85,28 +73,60 @@ export const EUROPEAN_LOCALE_OPTIONS = [
   option("sr-RS", "RS", "Serbia", "Srbija", "Serbian", "Srpski", "en-GB", "sr"),
   option("sk-SK", "SK", "Slovakia", "Slovensko", "Slovak", "Slovenčina", "en-GB", "sk"),
   option("sl-SI", "SI", "Slovenia", "Slovenija", "Slovenian", "Slovenščina", "en-GB", "sl"),
-  option("es-ES", "ES", "Spain", "España", "Spanish", "Español"),
+  option("es-ES", "ES", "Spain", "España", "Spanish", "Español", "en-GB", "es"),
   option("sv-SE", "SE", "Sweden", "Sverige", "Swedish", "Svenska", "en-GB", "sv"),
   option("de-CH", "CH", "Switzerland", "Schweiz", "German", "Deutsch", "en-GB", "de"),
   option("tr-TR", "TR", "Turkey", "Türkiye", "Turkish", "Türkçe", "en-GB", "tr"),
   option("uk-UA", "UA", "Ukraine", "Україна", "Ukrainian", "Українська", "en-GB", "uk"),
   option("en-GB", "GB", "United Kingdom", "United Kingdom", "English", "English", "en-GB", "en"),
   option("it-VA", "VA", "Vatican City", "Città del Vaticano", "Italian", "Italiano", "en-GB", "it"),
+  option("en-US", "US", "United States", "United States", "English", "English"),
+  option("en-CA", "CA", "Canada", "Canada", "English", "English"),
+  option("fr-CA", "CA", "Canada", "Canada", "French", "Français", "en-GB", "fr"),
+  option("es-MX", "MX", "Mexico", "México", "Spanish", "Español", "en-GB", "es"),
+  option("pt-BR", "BR", "Brazil", "Brasil", "Portuguese", "Português", "en-GB", "pt"),
+  option("es-AR", "AR", "Argentina", "Argentina", "Spanish", "Español", "en-GB", "es"),
+  option("es-CL", "CL", "Chile", "Chile", "Spanish", "Español", "en-GB", "es"),
+  option("es-CO", "CO", "Colombia", "Colombia", "Spanish", "Español", "en-GB", "es"),
+  option("en-ZA", "ZA", "South Africa", "South Africa", "English", "English"),
+  option("ar-EG", "EG", "Egypt", "مصر", "Arabic", "العربية", "en-GB", "ar"),
+  option("ar-MA", "MA", "Morocco", "المغرب", "Arabic", "العربية", "en-GB", "ar"),
+  option("en-NG", "NG", "Nigeria", "Nigeria", "English", "English"),
+  option("en-KE", "KE", "Kenya", "Kenya", "English", "English"),
+  option("ar-SA", "SA", "Saudi Arabia", "السعودية", "Arabic", "العربية", "en-GB", "ar"),
+  option("ar-AE", "AE", "United Arab Emirates", "الإمارات", "Arabic", "العربية", "en-GB", "ar"),
+  option("he-IL", "IL", "Israel", "ישראל", "Hebrew", "עברית"),
+  option("en-IN", "IN", "India", "India", "English", "English"),
+  option("zh-CN", "CN", "China", "中国", "Chinese", "中文", "en-GB", "zh"),
+  option("ja-JP", "JP", "Japan", "日本", "Japanese", "日本語", "en-GB", "ja"),
+  option("ko-KR", "KR", "South Korea", "대한민국", "Korean", "한국어", "en-GB", "ko"),
+  option("zh-TW", "TW", "Taiwan", "台灣", "Chinese", "中文", "en-GB", "zh"),
+  option("th-TH", "TH", "Thailand", "ประเทศไทย", "Thai", "ไทย"),
+  option("vi-VN", "VN", "Vietnam", "Việt Nam", "Vietnamese", "Tiếng Việt"),
+  option("id-ID", "ID", "Indonesia", "Indonesia", "Indonesian", "Bahasa Indonesia"),
+  option("en-PH", "PH", "Philippines", "Pilipinas", "English", "English"),
+  option("en-SG", "SG", "Singapore", "Singapore", "English", "English"),
+  option("ms-MY", "MY", "Malaysia", "Malaysia", "Malay", "Bahasa Melayu"),
+  option("en-AU", "AU", "Australia", "Australia", "English", "English"),
+  option("en-NZ", "NZ", "New Zealand", "New Zealand", "English", "English"),
 ] as const;
 
-export type AppLocale = (typeof EUROPEAN_LOCALE_OPTIONS)[number]["code"];
+export type LocaleOption = (typeof LOCALE_OPTIONS)[number];
 
-export const DEFAULT_LOCALE: AppLocale = "ro-RO";
+export type AppLocale = LocaleOption["code"];
 
-const localeOptionsByCode = new Map(
-  EUROPEAN_LOCALE_OPTIONS.map((localeOption) => [localeOption.code, localeOption]),
+export const DEFAULT_LOCALE: AppLocale = "en-GB";
+
+const localeOptionsByCode = new Map<AppLocale, LocaleOption>(
+  LOCALE_OPTIONS.map((localeOption) => [localeOption.code, localeOption]),
 );
+const localeCodes = new Set<string>(LOCALE_OPTIONS.map((localeOption) => localeOption.code));
 
 export function isAppLocale(value: string | null): value is AppLocale {
-  return Boolean(value && localeOptionsByCode.has(value));
+  return Boolean(value && localeCodes.has(value));
 }
 
-export function getLocaleOption(locale: AppLocale): EuropeanLocaleOption {
+export function getLocaleOption(locale: AppLocale): LocaleOption {
   return localeOptionsByCode.get(locale) ?? localeOptionsByCode.get(DEFAULT_LOCALE)!;
 }
 
@@ -127,8 +147,33 @@ export function getLocaleButtonLabel(locale: AppLocale) {
   return `${localeOption.countryCode} · ${localeOption.nativeLanguageName}`;
 }
 
-export function getLocaleOptionLabel(localeOption: EuropeanLocaleOption) {
+export function getLocaleOptionLabel(localeOption: LocaleOption) {
   return `${localeOption.nativeCountryName} · ${localeOption.nativeLanguageName}`;
+}
+
+const preferredLocaleByLanguage: Record<string, AppLocale> = {
+  ar: "ar-SA",
+  de: "de-DE",
+  en: "en-GB",
+  es: "es-ES",
+  fr: "fr-FR",
+  it: "it-IT",
+  ja: "ja-JP",
+  ko: "ko-KR",
+  pt: "pt-PT",
+  ro: "ro-RO",
+  zh: "zh-CN",
+};
+
+export function matchBrowserLocale(value: string | null | undefined): AppLocale | null {
+  if (!value) return null;
+  if (isAppLocale(value)) return value;
+
+  const language = value.toLowerCase().split("-")[0];
+  const preferred = preferredLocaleByLanguage[language];
+  if (preferred) return preferred;
+
+  return LOCALE_OPTIONS.find((localeOption) => localeOption.code.toLowerCase().startsWith(`${language}-`))?.code ?? null;
 }
 
 export type LocaleText = ReturnType<typeof getTranslations>;

@@ -1,21 +1,35 @@
 import type { Metadata } from "next";
+import { MARK_SRC, PRODUCT_NAME, resolveSiteOrigin } from "./brand";
 import { DEFAULT_LOCALE, getTranslations } from "./i18n";
 import "./globals.css";
 
 const defaultText = getTranslations(DEFAULT_LOCALE);
+const siteOrigin = resolveSiteOrigin();
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteOrigin),
   title: defaultText.meta.title,
   description: defaultText.meta.description,
+  applicationName: PRODUCT_NAME,
+  alternates: {
+    canonical: "/",
+    languages: {
+      en: "/",
+      ro: "/",
+    },
+  },
   icons: {
-    icon: "/parapantabil-logo.png",
-    shortcut: "/parapantabil-logo.png",
-    apple: "/parapantabil-logo.png",
+    icon: MARK_SRC,
+    shortcut: MARK_SRC,
+    apple: MARK_SRC,
   },
   openGraph: {
+    type: "website",
+    siteName: PRODUCT_NAME,
+    url: siteOrigin,
     title: defaultText.meta.title,
     description: defaultText.meta.description,
-    images: ["/parapantabil-logo.png"],
+    images: [MARK_SRC],
   },
 };
 
