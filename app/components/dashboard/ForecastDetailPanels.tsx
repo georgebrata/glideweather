@@ -1,24 +1,19 @@
 "use client";
 
-import AirIcon from "@mui/icons-material/Air";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import SpeedIcon from "@mui/icons-material/Speed";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
-import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
-  Alert,
-  Box,
-  LinearProgress,
-  Skeleton,
-  Stack,
-  Tab,
-  Tabs,
-  Typography,
-} from "@mui/material";
+import { AlertTriangle, Gauge, Wind } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { type ReactNode, useMemo } from "react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/app/components/ui/accordion";
+import { Alert, AlertDescription } from "@/app/components/ui/alert";
+import { Progress } from "@/app/components/ui/progress";
+import { Skeleton } from "@/app/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/ui/tabs";
+import { cn } from "@/app/lib/utils";
 import {
   CurrentSnapshot,
   DayForecast,
@@ -35,13 +30,7 @@ import {
 import { statusToneByMode, type ThemeMode } from "../../theme/flightTokens";
 import { useLocaleText } from "./LocaleContext";
 
-function panelSx(themeMode: ThemeMode) {
-  return {
-    border: "1px solid var(--border-flight)",
-    borderRadius: 16,
-    backgroundColor: "var(--card)",
-  };
-}
+const panelClass = "rounded-2xl border border-[var(--border-flight)] bg-card p-4";
 
 function gustSpreadOf(sample: WeatherSample) {
   if (sample.windSpeed === null || sample.windGusts === null) return null;
@@ -69,36 +58,39 @@ export const ForecastDetailPanels = ({
   const { locale, t } = useLocaleText();
 
   return (
-    <Stack spacing={2}>
-      <Tabs
-        value={activeTab}
-        onChange={(_, nextValue: number) => setActiveTab(nextValue)}
-        variant="scrollable"
-        scrollButtons="auto"
-        sx={{
-          minHeight: 40,
-          "& .MuiTabs-indicator": { display: "none" },
-          "& .MuiTabs-flexContainer": { gap: 0.5 },
-          "& .MuiTab-root.Mui-selected": {
-            color: themeMode === "dark" ? "#041116" : "#fff",
-            backgroundColor: "primary.main",
-            borderRadius: 12,
-          },
-        }}
-      >
-        <Tab label={t.tabs.now} value={0} />
+    <Tabs value={String(activeTab)} onValueChange={(value) => setActiveTab(Number(value))} className="gap-4">
+      <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto bg-transparent p-0">
+        <TabsTrigger
+          value="0"
+          className="rounded-xl border border-transparent px-3 py-2 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+        >
+          {t.tabs.now}
+        </TabsTrigger>
         {[1, 2, 3].map((offset) => (
-          <Tab key={offset} label={formatDateLabel(dateForOffset(offset), locale)} value={offset} />
+          <TabsTrigger
+            key={offset}
+            value={String(offset)}
+            className="rounded-xl border border-transparent px-3 py-2 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          >
+            {formatDateLabel(dateForOffset(offset), locale)}
+          </TabsTrigger>
         ))}
-      </Tabs>
+      </TabsList>
 
-      {activeTab === 0 ? (
+      <TabsContent value="0" className="mt-0">
         <CurrentDayDetail currentQuery={currentQuery} location={location} themeMode={themeMode} />
-      ) : null}
+      </TabsContent>
       {[1, 2, 3].map((offset) => (
-        <ForecastDayDetail key={offset} active={activeTab === offset} location={location} offset={offset} themeMode={themeMode} />
+        <TabsContent key={offset} value={String(offset)} className="mt-0">
+          <ForecastDayDetail
+            active={activeTab === offset}
+            location={location}
+            offset={offset}
+            themeMode={themeMode}
+          />
+        </TabsContent>
       ))}
-    </Stack>
+    </Tabs>
   );
 };
 
@@ -132,20 +124,24 @@ const CurrentDayDetail = ({
   }, [forecastQuery.data, snapshot]);
 
   if (currentQuery.error) {
-    return <Alert severity="error">{t.current.loadError(currentQuery.error.message)}</Alert>;
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{t.current.loadError(currentQuery.error.message)}</AlertDescription>
+      </Alert>
+    );
   }
   if (currentQuery.isLoading || !snapshot || !detailSample) {
-    return <Skeleton variant="rounded" height={200} />;
+    return <Skeleton className="h-[200px] w-full rounded-2xl" />;
   }
 
   return (
-    <Stack spacing={2}>
-      {currentQuery.isFetching ? <LinearProgress color="primary" /> : null}
+    <div className="flex flex-col gap-4">
+      {currentQuery.isFetching ? <Progress value={100} className="h-1 animate-pulse" /> : null}
       <VerdictPanel sample={snapshot.sample} verdict={snapshot.verdict} themeMode={themeMode} />
-      <DetailRow sample={detailSample} timezone={snapshot.timezone} themeMode={themeMode} />
+      <DetailRow sample={detailSample} timezone={snapshot.timezone} />
       {forecastQuery.data ? <LaunchWindowScanner forecast={forecastQuery.data} themeMode={themeMode} /> : null}
-      <ExtraMetrics sample={detailSample} themeMode={themeMode} />
-    </Stack>
+      <ExtraMetrics sample={detailSample} />
+    </div>
   );
 };
 
@@ -175,21 +171,30 @@ const ForecastDayDetail = ({
 
   if (!active) return null;
   if (forecastQuery.error) {
-    return <Alert severity="error">{t.forecast.loadError(forecastQuery.error.message)}</Alert>;
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{t.forecast.loadError(forecastQuery.error.message)}</AlertDescription>
+      </Alert>
+    );
   }
-  if (forecastQuery.isLoading || !forecastQuery.data) return <Skeleton variant="rounded" height={200} />;
+  if (forecastQuery.isLoading || !forecastQuery.data) return <Skeleton className="h-[200px] w-full rounded-2xl" />;
 
   const forecast = forecastQuery.data;
   const sample = forecast.best.sample;
 
   return (
-    <Stack spacing={2}>
+    <div className="flex flex-col gap-4">
       <DailySummary forecast={forecast} />
-      <VerdictPanel contextTitle={t.forecast.bestWindow} sample={sample} verdict={forecast.best.verdict} themeMode={themeMode} />
-      {sample ? <DetailRow sample={sample} timezone={forecast.timezone} themeMode={themeMode} /> : null}
+      <VerdictPanel
+        contextTitle={t.forecast.bestWindow}
+        sample={sample}
+        verdict={forecast.best.verdict}
+        themeMode={themeMode}
+      />
+      {sample ? <DetailRow sample={sample} timezone={forecast.timezone} /> : null}
       <LaunchWindowScanner forecast={forecast} themeMode={themeMode} />
-      {sample ? <ExtraMetrics sample={sample} themeMode={themeMode} /> : null}
-    </Stack>
+      {sample ? <ExtraMetrics sample={sample} /> : null}
+    </div>
   );
 };
 
@@ -202,11 +207,7 @@ const DailySummary = ({ forecast }: { forecast: DayForecast }) => {
     `${t.console.rain} ${percentLabel(forecast.daily.precipitationProbabilityMax, locale)}`,
     `${formatTime(forecast.daily.sunrise, forecast.timezone, locale)}–${formatTime(forecast.daily.sunset, forecast.timezone, locale)}`,
   ];
-  return (
-    <Typography variant="body2" sx={{ color: "text.secondary" }}>
-      {parts.join(" · ")}
-    </Typography>
-  );
+  return <p className="text-sm text-muted-foreground">{parts.join(" · ")}</p>;
 };
 
 const VerdictPanel = ({
@@ -225,83 +226,97 @@ const VerdictPanel = ({
   const unavailable = t.common.notAvailable;
 
   return (
-    <Box sx={{ ...panelSx(themeMode), p: 2 }}>
-      <Stack spacing={1.25}>
-        {contextTitle ? <Typography variant="h3">{contextTitle}</Typography> : null}
-        <Typography variant="h2" sx={{ color: tone.color }}>{verdict.title}</Typography>
+    <div className={panelClass}>
+      <div className="flex flex-col gap-3">
+        {contextTitle ? <h3 className="text-lg font-semibold">{contextTitle}</h3> : null}
+        <h2 className="text-xl font-bold" style={{ color: tone.color }}>
+          {verdict.title}
+        </h2>
         {verdict.reasons.slice(0, 3).map((reason) => (
-          <RiskLine key={reason} color={tone.color}>{reason}</RiskLine>
+          <RiskLine key={reason} color={tone.color}>
+            {reason}
+          </RiskLine>
         ))}
-        <Stack direction="row" spacing={2} useFlexGap sx={{ flexWrap: "wrap" }}>
-          <Fact icon={<AirIcon fontSize="small" />} label={t.decision.wind} value={sample ? numberLabel(sample.windSpeed, "km/h", 0, locale) : unavailable} />
-          <Fact icon={<SpeedIcon fontSize="small" />} label={t.decision.gust} value={sample ? numberLabel(sample.windGusts, "km/h", 0, locale) : unavailable} />
+        <div className="flex flex-wrap gap-4">
+          <Fact
+            icon={<Wind className="size-4" />}
+            label={t.decision.wind}
+            value={sample ? numberLabel(sample.windSpeed, "km/h", 0, locale) : unavailable}
+          />
+          <Fact
+            icon={<Gauge className="size-4" />}
+            label={t.decision.gust}
+            value={sample ? numberLabel(sample.windGusts, "km/h", 0, locale) : unavailable}
+          />
           <Fact label={t.console.spread} value={sample ? numberLabel(gustSpreadOf(sample), "km/h", 0, locale) : unavailable} />
-        </Stack>
-      </Stack>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 };
 
-const DetailRow = ({
-  sample,
-  timezone,
-  themeMode,
-}: {
-  sample: WeatherSample;
-  timezone: string;
-  themeMode: ThemeMode;
-}) => {
+const DetailRow = ({ sample, timezone }: { sample: WeatherSample; timezone: string }) => {
   const { locale, t } = useLocaleText();
   return (
-    <Box sx={{ ...panelSx(themeMode), p: 2 }}>
-      <Stack spacing={1.25}>
-        <Typography variant="h3">{sample.weatherLabel}</Typography>
-        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+    <div className={panelClass}>
+      <div className="flex flex-col gap-3">
+        <h3 className="text-lg font-semibold">{sample.weatherLabel}</h3>
+        <p className="text-sm text-muted-foreground">
           {t.atmosphere.updatedAt(formatTime(sample.time, timezone, locale))}
-        </Typography>
-        <Box sx={{ display: "grid", gap: 1.25, gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(3, 1fr)" } }}>
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
           <Fact label={t.atmosphere.direction} value={windDirectionLabel(sample.windDirection, locale)} />
           <Fact label={t.atmosphere.temperature} value={numberLabel(sample.temperature, "C", 1, locale)} />
           <Fact label={t.metrics.visibility} value={distanceLabel(sample.visibility, locale, t.common.notAvailable)} />
           <Fact label={t.console.rain} value={percentLabel(sample.precipitationProbability, locale)} />
           <Fact label={t.console.cape} value={numberLabel(sample.cape, "J/kg", 0, locale)} />
-        </Box>
-      </Stack>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 };
 
 const LaunchWindowScanner = ({ forecast, themeMode }: { forecast: DayForecast; themeMode: ThemeMode }) => {
   const { locale, t } = useLocaleText();
   return (
-    <Stack spacing={1.25}>
-      <Box>
-        <Typography variant="h3">{t.console.windowsTitle}</Typography>
-        <Typography variant="body2" sx={{ color: "text.secondary" }}>{t.console.windowsSubtitle}</Typography>
-      </Box>
+    <div className="flex flex-col gap-3">
+      <div>
+        <h3 className="text-lg font-semibold">{t.console.windowsTitle}</h3>
+        <p className="text-sm text-muted-foreground">{t.console.windowsSubtitle}</p>
+      </div>
       {forecast.topWindows.length === 0 ? (
-        <Alert severity="warning">{t.scanner.empty}</Alert>
+        <Alert>
+          <AlertDescription>{t.scanner.empty}</AlertDescription>
+        </Alert>
       ) : (
-        <Stack spacing={1}>
+        <div className="flex flex-col gap-2">
           {forecast.topWindows.map(({ sample, verdict }) => {
             const tone = statusToneByMode[themeMode][verdict.status];
             return (
-              <Box key={sample.time} sx={{ ...panelSx(themeMode), p: 1.25, display: "grid", gap: 1, gridTemplateColumns: { xs: "1fr", md: "88px 1fr 1fr" } }}>
-                <Typography sx={{ fontWeight: 700 }}>{formatTime(sample.time, forecast.timezone, locale)}</Typography>
-                <Typography variant="body2" sx={{ color: tone.color, fontWeight: 700 }}>{verdict.title}</Typography>
-                <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                  {t.scanner.windGust(numberLabel(sample.windSpeed, "km/h", 0, locale), numberLabel(sample.windGusts, "km/h", 0, locale))}
-                </Typography>
-              </Box>
+              <div
+                key={sample.time}
+                className={cn(panelClass, "grid gap-2 p-3 md:grid-cols-[88px_1fr_1fr]")}
+              >
+                <p className="font-bold">{formatTime(sample.time, forecast.timezone, locale)}</p>
+                <p className="text-sm font-bold" style={{ color: tone.color }}>
+                  {verdict.title}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {t.scanner.windGust(
+                    numberLabel(sample.windSpeed, "km/h", 0, locale),
+                    numberLabel(sample.windGusts, "km/h", 0, locale),
+                  )}
+                </p>
+              </div>
             );
           })}
-        </Stack>
+        </div>
       )}
-    </Stack>
+    </div>
   );
 };
 
-const ExtraMetrics = ({ sample, themeMode }: { sample: WeatherSample; themeMode: ThemeMode }) => {
+const ExtraMetrics = ({ sample }: { sample: WeatherSample }) => {
   const { locale, t } = useLocaleText();
   const items = [
     { label: t.metrics.pressure, value: numberLabel(sample.pressure, "hPa", 0, locale) },
@@ -312,32 +327,34 @@ const ExtraMetrics = ({ sample, themeMode }: { sample: WeatherSample; themeMode:
     { label: t.console.pm25, value: numberLabel(sample.pm25, "ug/m3", 1, locale) },
   ];
   return (
-    <Accordion disableGutters elevation={0} sx={{ ...panelSx(themeMode), "&:before": { display: "none" } }}>
-      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Typography sx={{ fontWeight: 700 }}>{t.console.moreData}</Typography>
-      </AccordionSummary>
-      <AccordionDetails>
-        <Box sx={{ display: "grid", gap: 1.5, gridTemplateColumns: { xs: "1fr 1fr", sm: "repeat(3, 1fr)" } }}>
-          {items.map((item) => <Fact key={item.label} label={item.label} value={item.value} />)}
-        </Box>
-      </AccordionDetails>
+    <Accordion type="single" collapsible className={cn(panelClass, "px-0 py-0")}>
+      <AccordionItem value="more" className="border-none px-4">
+        <AccordionTrigger className="py-4 font-bold hover:no-underline">{t.console.moreData}</AccordionTrigger>
+        <AccordionContent>
+          <div className="grid gap-4 pb-4 sm:grid-cols-2 md:grid-cols-3">
+            {items.map((item) => (
+              <Fact key={item.label} label={item.label} value={item.value} />
+            ))}
+          </div>
+        </AccordionContent>
+      </AccordionItem>
     </Accordion>
   );
 };
 
 const Fact = ({ icon, label, value }: { icon?: ReactNode; label: string; value: string }) => (
-  <Box>
-    <Stack direction="row" spacing={0.5} sx={{ color: "text.secondary", alignItems: "center" }}>
+  <div>
+    <div className="flex items-center gap-1 text-muted-foreground">
       {icon}
-      <Typography variant="body2">{label}</Typography>
-    </Stack>
-    <Typography sx={{ fontWeight: 700 }}>{value}</Typography>
-  </Box>
+      <span className="text-sm">{label}</span>
+    </div>
+    <p className="font-bold">{value}</p>
+  </div>
 );
 
 const RiskLine = ({ children, color }: { children: ReactNode; color: string }) => (
-  <Stack direction="row" spacing={0.75} sx={{ alignItems: "flex-start" }}>
-    <WarningAmberIcon sx={{ color, fontSize: 18, mt: "2px" }} />
-    <Typography variant="body2">{children}</Typography>
-  </Stack>
+  <div className="flex items-start gap-2">
+    <AlertTriangle className="mt-0.5 size-4 shrink-0" style={{ color }} />
+    <p className="text-sm">{children}</p>
+  </div>
 );

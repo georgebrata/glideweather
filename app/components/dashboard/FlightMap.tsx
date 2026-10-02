@@ -1,14 +1,12 @@
 "use client";
 
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import LandscapeIcon from "@mui/icons-material/Landscape";
-import PlaceIcon from "@mui/icons-material/Place";
-import AirIcon from "@mui/icons-material/Air";
-import { Box, Button, ButtonGroup, Stack, Typography } from "@mui/material";
+import { ChevronRight, MapPin, Mountain, Wind } from "lucide-react";
 import * as maplibregl from "maplibre-gl";
 import type { GeoJSONSource, Map as MapLibreMap, Marker } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "@/app/components/ui/button";
+import { cn } from "@/app/lib/utils";
 import { formatCoordinateOverlay, locationFromCoordinates, reverseGeocode } from "../../lib/location";
 import { fetchWindGrid, type WindGridPoint } from "../../lib/windGrid";
 import type { LocationChoice } from "../../lib/weather";
@@ -33,7 +31,7 @@ function ringsGeoJson(lng: number, lat: number) {
   const radii = [0.5, 1, 1.5, 2];
   return {
     type: "FeatureCollection" as const,
-    features: radii.map((radius, index) => ({
+    features: radii.map((radius) => ({
       type: "Feature" as const,
       properties: { radius },
       geometry: {
@@ -88,8 +86,8 @@ export const FlightMap = ({
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
   const [mapMode, setMapMode] = useState<MapMode>("wind");
-  const [windPoints, setWindPoints] = useState<WindGridPoint[]>([]);
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const settleLocation = useCallback(
     (latitude: number, longitude: number) => {
       if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
@@ -97,7 +95,6 @@ export const FlightMap = ({
         const reversed = await reverseGeocode(latitude, longitude, locale);
         onLocationChange(reversed ?? locationFromCoordinates(latitude, longitude, locale));
         const grid = await fetchWindGrid(latitude, longitude);
-        setWindPoints(grid);
         const map = mapRef.current;
         if (map?.getSource("wind-barbs")) {
           (map.getSource("wind-barbs") as GeoJSONSource).setData(windBarbsGeoJson(grid));
@@ -245,132 +242,60 @@ export const FlightMap = ({
     }
   }, [mapMode]);
 
-  const modeButtons = useMemo(
-    () => (
-      <ButtonGroup
-        sx={{
-          bgcolor: "var(--card)",
-          border: "1px solid var(--border-flight)",
-          borderRadius: 999,
-          p: 0.35,
-          "& .MuiButton-root": {
-            border: "none",
-            borderRadius: 999,
-            minWidth: 88,
-            color: "text.secondary",
-            "&.active": {
-              bgcolor: "primary.main",
-              color: themeMode === "dark" ? "#041116" : "#fff",
-            },
-          },
-        }}
-      >
+  return (
+    <div
+      className="relative h-full min-h-[320px] overflow-hidden border border-[var(--border-flight)] bg-card md:min-h-[520px]"
+      style={{ borderRadius: tokens.innerRadius }}
+    >
+      <div ref={containerRef} className="absolute inset-0" />
+      <div className="absolute top-4 left-4 z-10 flex rounded-full border border-[var(--border-flight)] bg-card p-1">
         <Button
-          className={mapMode === "wind" ? "active" : undefined}
+          type="button"
+          size="sm"
+          variant={mapMode === "wind" ? "pill-active" : "ghost"}
+          className={cn("min-w-[88px] rounded-full", mapMode !== "wind" && "text-muted-foreground")}
           onClick={() => setMapMode("wind")}
-          startIcon={<AirIcon sx={{ fontSize: 16 }} />}
         >
+          <Wind className="size-4" />
           {t.flightWindow.mapWind}
         </Button>
         <Button
-          className={mapMode === "terrain" ? "active" : undefined}
+          type="button"
+          size="sm"
+          variant={mapMode === "terrain" ? "pill-active" : "ghost"}
+          className={cn("min-w-[88px] rounded-full", mapMode !== "terrain" && "text-muted-foreground")}
           onClick={() => setMapMode("terrain")}
-          startIcon={<LandscapeIcon sx={{ fontSize: 16 }} />}
         >
+          <Mountain className="size-4" />
           {t.flightWindow.mapTerrain}
         </Button>
-      </ButtonGroup>
-    ),
-    [mapMode, t.flightWindow.mapTerrain, t.flightWindow.mapWind, themeMode],
-  );
-
-  return (
-    <Box
-      sx={{
-        position: "relative",
-        minHeight: { xs: 320, md: 520 },
-        height: "100%",
-        borderRadius: `${tokens.innerRadius}px`,
-        overflow: "hidden",
-        bgcolor: "var(--card)",
-        border: "1px solid var(--border-flight)",
-      }}
-    >
-      <Box ref={containerRef} sx={{ position: "absolute", inset: 0 }} />
-      <Box sx={{ position: "absolute", top: 16, left: 16, zIndex: 2 }}>{modeButtons}</Box>
+      </div>
       {coordinateLabel ? (
-        <Typography
-          variant="body2"
-          sx={{
-            position: "absolute",
-            top: 16,
-            right: 16,
-            zIndex: 2,
-            color: "text.secondary",
-            fontSize: "0.72rem",
-            letterSpacing: "0.04em",
-          }}
-        >
+        <p className="telemetry absolute top-4 right-4 z-10 text-[0.72rem] tracking-wide text-muted-foreground">
           {coordinateLabel}
-        </Typography>
+        </p>
       ) : null}
       {location ? (
-        <Box
-          component="button"
+        <button
           type="button"
           onClick={onOpenSites}
-          sx={{
-            position: "absolute",
-            left: 16,
-            bottom: 16,
-            zIndex: 2,
-            display: "flex",
-            alignItems: "center",
-            gap: 1.25,
-            textAlign: "left",
-            border: "1px solid var(--border-flight)",
-            borderRadius: 14,
-            bgcolor: "rgba(7, 20, 16, 0.82)",
-            color: "text.primary",
-            p: 1.25,
-            pr: 1,
-            cursor: "pointer",
-            maxWidth: "min(280px, calc(100% - 32px))",
-            backdropFilter: "blur(8px)",
-          }}
+          className="frosted-chip absolute bottom-4 left-4 z-10 flex max-w-[min(280px,calc(100%-32px))] items-center gap-3 rounded-2xl border border-[var(--border-flight)] p-3 pr-2 text-left transition-colors hover:border-primary/40"
         >
-          <Box
-            sx={{
-              width: 36,
-              height: 36,
-              borderRadius: 10,
-              border: "1px solid var(--border-flight)",
-              display: "grid",
-              placeItems: "center",
-              flexShrink: 0,
-            }}
-          >
-            <PlaceIcon sx={{ fontSize: 18, color: "primary.main" }} />
-          </Box>
-          <Stack spacing={0.15} sx={{ minWidth: 0, flex: 1 }}>
-            <Typography
-              variant="body2"
-              sx={{ color: "text.secondary", fontSize: "0.65rem", letterSpacing: "0.1em" }}
-            >
+          <span className="grid size-9 shrink-0 place-items-center rounded-[10px] border border-[var(--border-flight)]">
+            <MapPin className="size-4 text-primary animate-halo" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[0.65rem] tracking-widest text-muted-foreground uppercase">
               {t.flightWindow.selectedLocation}
-            </Typography>
-            <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
-              {location.name}
-            </Typography>
+            </span>
+            <span className="block truncate font-bold">{location.name}</span>
             {location.detail ? (
-              <Typography variant="body2" sx={{ color: "text.secondary" }} noWrap>
-                {location.detail}
-              </Typography>
+              <span className="block truncate text-sm text-muted-foreground">{location.detail}</span>
             ) : null}
-          </Stack>
-          <ChevronRightIcon sx={{ color: "text.secondary", flexShrink: 0 }} />
-        </Box>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+        </button>
       ) : null}
-    </Box>
+    </div>
   );
 };

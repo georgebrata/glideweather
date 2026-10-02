@@ -1,8 +1,14 @@
 "use client";
 
-import CloseIcon from "@mui/icons-material/Close";
-import { Box, Drawer, IconButton, Stack, Typography } from "@mui/material";
+import { X } from "lucide-react";
 import type { UseQueryResult } from "@tanstack/react-query";
+import { Button } from "@/app/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/app/components/ui/sheet";
 import { CurrentSnapshot } from "../../lib/weather";
 import type { ThemeMode } from "../../theme/flightTokens";
 import { useLocaleText } from "./LocaleContext";
@@ -28,28 +34,19 @@ export const ForecastDrawer = ({
   const { t } = useLocaleText();
 
   return (
-    <Drawer
-      anchor="right"
-      open={open}
-      onClose={onClose}
-      slotProps={{
-        paper: {
-          sx: {
-            width: { xs: "100%", sm: 520, md: 640 },
-            bgcolor: "background.default",
-            borderLeft: "1px solid var(--border-flight)",
-          },
-        },
-      }}
-    >
-      <Stack spacing={2} sx={{ p: 2.5, height: "100%", overflow: "auto" }}>
-        <Stack direction="row" sx={{ alignItems: "center", justifyContent: "space-between" }}>
-          <Typography variant="h2">{t.flightWindow.fullForecast}</Typography>
-          <IconButton aria-label={t.language.close} onClick={onClose}>
-            <CloseIcon />
-          </IconButton>
-        </Stack>
-        <Box>
+    <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        className="w-full border-l border-[var(--border-flight)] bg-background p-0 sm:max-w-[520px] md:max-w-[640px]"
+      >
+        <div className="flex h-full flex-col gap-4 overflow-auto p-5">
+          <SheetHeader className="flex-row items-center justify-between space-y-0 p-0">
+            <SheetTitle className="text-2xl font-semibold">{t.flightWindow.fullForecast}</SheetTitle>
+            <Button type="button" variant="instrument" size="icon-round" aria-label={t.language.close} onClick={onClose}>
+              <X className="size-4" />
+            </Button>
+          </SheetHeader>
           <ForecastDetailPanels
             location={location}
             activeTab={activeTab}
@@ -57,8 +54,8 @@ export const ForecastDrawer = ({
             currentQuery={currentQuery}
             themeMode={themeMode}
           />
-        </Box>
-      </Stack>
-    </Drawer>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 };

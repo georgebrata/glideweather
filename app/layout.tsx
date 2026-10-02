@@ -1,14 +1,23 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { IBM_Plex_Mono, Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { authEnabled } from "../flags";
 import { MARK_SRC, PRODUCT_NAME, resolveSiteOrigin } from "./brand";
+import { glideClerkAppearance } from "./lib/clerkAppearance";
 import { DEFAULT_LOCALE, getTranslations } from "./i18n";
 import "./globals.css";
 
 const inter = Inter({
   subsets: ["latin", "latin-ext"],
   variable: "--font-inter",
+  display: "swap",
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-ibm-plex-mono",
   display: "swap",
 });
 
@@ -42,17 +51,26 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const authOn = await authEnabled();
+
   return (
-    <html lang={defaultText.meta.documentLang} suppressHydrationWarning>
-      <body className={inter.variable}>
-        <ClerkProvider>
-          {children}
-        </ClerkProvider>
+    <html
+      lang={defaultText.meta.documentLang}
+      className={`dark ${inter.variable} ${ibmPlexMono.variable}`}
+      data-theme="dark"
+      suppressHydrationWarning
+    >
+      <body className="antialiased">
+        {authOn ? (
+          <ClerkProvider appearance={glideClerkAppearance}>{children}</ClerkProvider>
+        ) : (
+          children
+        )}
         <Analytics />
       </body>
     </html>

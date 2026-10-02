@@ -1,10 +1,9 @@
 "use client";
 
-import { CssBaseline, ThemeProvider } from "@mui/material";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { TooltipProvider } from "@/app/components/ui/tooltip";
 import { getTranslations } from "../i18n";
-import { createAppTheme } from "../theme/createAppTheme";
 import { LocaleContext } from "./dashboard/LocaleContext";
 import {
   getServerLocale,
@@ -29,21 +28,23 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
     readInitialThemeMode,
     getServerThemeMode,
   );
-  const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
   const locale = useSyncExternalStore(subscribeLocale, readInitialLocale, getServerLocale);
   const t = useMemo(() => getTranslations(locale), [locale]);
+
   useEffect(() => {
-    document.documentElement.dataset.theme = themeMode;
-    document.documentElement.style.colorScheme = themeMode;
-    document.documentElement.lang = t.meta.documentLang;
+    const root = document.documentElement;
+    root.dataset.theme = themeMode;
+    root.style.colorScheme = themeMode;
+    root.lang = t.meta.documentLang;
+    root.classList.toggle("dark", themeMode === "dark");
+    root.classList.toggle("light", themeMode === "light");
   }, [t.meta.documentLang, themeMode]);
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
+      <TooltipProvider delayDuration={200}>
         <LocaleContext.Provider value={{ locale, t }}>{children}</LocaleContext.Provider>
-      </ThemeProvider>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 };

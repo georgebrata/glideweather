@@ -1,56 +1,160 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent-ui);
+  --color-accent-foreground: var(--accent-ui-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-panel: var(--panel);
+  --color-flight-accent: var(--accent);
+  --color-flight-border: var(--border-flight);
+  --color-caution: var(--caution);
+
+  --radius-sm: calc(var(--radius) * 0.75);
+  --radius-md: calc(var(--radius) * 0.875);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.5);
+  --radius-2xl: calc(var(--radius) * 1.75);
+  --radius-3xl: calc(var(--radius) * 2);
+}
+
 :root {
   --background: #071410;
   --foreground: #f4fffb;
   --panel: #0d1c18;
   --card: #10241f;
+  --card-foreground: #f4fffb;
+  --popover: #0d1c18;
+  --popover-foreground: #f4fffb;
+  --primary: #3dffc8;
+  --primary-foreground: #030806;
+  --secondary: #152822;
+  --secondary-foreground: #f4fffb;
+  --muted: #152822;
+  --muted-foreground: #8aa399;
+  --accent-ui: rgba(61, 255, 200, 0.12);
+  --accent-ui-foreground: #3dffc8;
+  --destructive: #ff6b8a;
+  --destructive-foreground: #f4fffb;
+  --border: rgba(140, 255, 214, 0.14);
+  --input: rgba(140, 255, 214, 0.18);
+  --ring: #3dffc8;
+  --chart-1: #3dffc8;
+  --chart-2: #e6c15a;
+  --chart-3: #8aa399;
+  --chart-4: #ff6b8a;
+  --chart-5: #5c9a88;
+  --radius: 0.875rem;
   --accent: #3dffc8;
   --text-muted: #8aa399;
   --border-flight: rgba(140, 255, 214, 0.14);
+  --caution: #e6c15a;
+  --shell-radius: 28px;
   color-scheme: dark;
 }
 
-:root[data-theme="light"] {
+:root[data-theme="light"],
+.light {
   --background: #e7f2ec;
   --foreground: #10241c;
   --panel: #f7fbf8;
   --card: #ffffff;
+  --card-foreground: #10241c;
+  --popover: #f7fbf8;
+  --popover-foreground: #10241c;
+  --primary: #0b8f78;
+  --primary-foreground: #f7fbf8;
+  --secondary: #e0ece6;
+  --secondary-foreground: #10241c;
+  --muted: #e0ece6;
+  --muted-foreground: #5c756c;
+  --accent-ui: rgba(11, 143, 120, 0.1);
+  --accent-ui-foreground: #0b8f78;
+  --destructive: #be123c;
+  --destructive-foreground: #f7fbf8;
+  --border: rgba(11, 143, 120, 0.18);
+  --input: rgba(11, 143, 120, 0.22);
+  --ring: #0b8f78;
   --accent: #0b8f78;
   --text-muted: #5c756c;
   --border-flight: rgba(11, 143, 120, 0.18);
+  --caution: #9a6b12;
   color-scheme: light;
 }
 
-:root[data-theme="dark"] {
+:root[data-theme="dark"],
+.dark {
   --background: #071410;
   --foreground: #f4fffb;
   --panel: #0d1c18;
   --card: #10241f;
+  --card-foreground: #f4fffb;
+  --popover: #0d1c18;
+  --popover-foreground: #f4fffb;
+  --primary: #3dffc8;
+  --primary-foreground: #030806;
+  --secondary: #152822;
+  --secondary-foreground: #f4fffb;
+  --muted: #152822;
+  --muted-foreground: #8aa399;
+  --accent-ui: rgba(61, 255, 200, 0.12);
+  --accent-ui-foreground: #3dffc8;
+  --destructive: #ff6b8a;
+  --destructive-foreground: #f4fffb;
+  --border: rgba(140, 255, 214, 0.14);
+  --input: rgba(140, 255, 214, 0.18);
+  --ring: #3dffc8;
   --accent: #3dffc8;
   --text-muted: #8aa399;
   --border-flight: rgba(140, 255, 214, 0.14);
+  --caution: #e6c15a;
   color-scheme: dark;
 }
 
-* {
-  box-sizing: border-box;
-}
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    box-sizing: border-box;
+  }
 
-html {
-  background: var(--background);
-}
+  html {
+    @apply bg-background;
+  }
 
-body {
-  min-width: 320px;
-  margin: 0;
-  background: var(--background);
-  color: var(--foreground);
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", sans-serif;
-}
+  body {
+    @apply bg-background text-foreground min-w-[320px] m-0 font-sans antialiased;
+    overflow-x: hidden;
+  }
 
-a {
-  color: inherit;
+  a {
+    color: inherit;
+  }
 }
 
 ::selection {
@@ -58,12 +162,72 @@ a {
   color: #ffffff;
 }
 
-:root[data-theme="light"] ::selection {
+:root[data-theme="light"] ::selection,
+.light ::selection {
   background: rgba(8, 127, 130, 0.22);
   color: #102033;
 }
 
-html,
-body {
-  overflow-x: hidden;
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(0.92);
+  }
+}
+
+@keyframes halo-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 12px var(--accent);
+  }
+  50% {
+    box-shadow: 0 0 20px var(--accent);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .animate-live-dot {
+    animation: live-pulse 2.8s ease-in-out infinite;
+  }
+
+  .animate-halo {
+    animation: halo-pulse 3.2s ease-in-out infinite;
+  }
+}
+
+.nocturne-canvas {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 20%, rgba(12, 36, 28, 0.85) 0%, transparent 55%),
+    radial-gradient(ellipse 100% 100% at 50% 50%, rgba(3, 8, 6, 0.4) 0%, transparent 70%),
+    var(--background);
+}
+
+.instrument-console {
+  border: 1px solid var(--border-flight);
+  border-radius: var(--shell-radius);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.eyebrow {
+  @apply text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-muted-foreground;
+}
+
+.telemetry {
+  @apply font-mono tabular-nums;
+}
+
+.frosted-chip {
+  background: rgba(7, 20, 16, 0.82);
+  backdrop-filter: blur(12px);
+}
+
+:root[data-theme="light"] .frosted-chip,
+.light .frosted-chip {
+  background: rgba(247, 251, 248, 0.88);
 }

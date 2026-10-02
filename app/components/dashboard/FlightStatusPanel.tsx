@@ -1,12 +1,10 @@
 "use client";
 
-import AirIcon from "@mui/icons-material/Air";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
-import CloudQueueIcon from "@mui/icons-material/CloudQueue";
-import VisibilityIcon from "@mui/icons-material/Visibility";
-import { Box, LinearProgress, Skeleton, Stack, Typography } from "@mui/material";
+import { ChevronRight, Cloud, Eye, Wind } from "lucide-react";
 import type { ReactNode } from "react";
-import { alpha, useTheme } from "@mui/material/styles";
+import { Button } from "@/app/components/ui/button";
+import { Progress } from "@/app/components/ui/progress";
+import { Skeleton } from "@/app/components/ui/skeleton";
 import {
   estimateCloudBaseMeters,
   favorableUntilMessage,
@@ -25,6 +23,7 @@ import {
   windDirectionLabel,
 } from "../../lib/weather";
 import { flightTokensByMode, statusToneByMode, type ThemeMode } from "../../theme/flightTokens";
+import { cn } from "@/app/lib/utils";
 import { useLocaleText } from "./LocaleContext";
 
 function distanceKm(value: number | null, locale: string) {
@@ -45,17 +44,16 @@ export const FlightStatusPanel = ({
   loading: boolean;
   onOpenFullForecast: () => void;
 }) => {
-  const theme = useTheme();
   const { locale, t } = useLocaleText();
   const tokens = flightTokensByMode[themeMode];
 
   if (loading || !snapshot) {
     return (
-      <Stack spacing={2} sx={{ p: { xs: 2, md: 2.5 }, height: "100%" }}>
-        <Skeleton variant="rounded" height={140} />
-        <Skeleton variant="rounded" height={88} />
-        <Skeleton variant="rounded" height={180} />
-      </Stack>
+      <div className="flex h-full flex-col gap-4 p-4 md:p-5">
+        <Skeleton className="h-[140px] w-full rounded-2xl" />
+        <Skeleton className="h-[88px] w-full rounded-2xl" />
+        <Skeleton className="h-[180px] w-full rounded-2xl" />
+      </div>
     );
   }
 
@@ -68,187 +66,130 @@ export const FlightStatusPanel = ({
   const hourly = forecast?.samples ?? [];
   const slots = nextSixHourSlots(hourly, snapshot.timezone, locale);
   const maxWindMs = Math.max(...slots.map((slot) => slot.windMs ?? 0), 1);
+  const ringTrack = themeMode === "dark" ? "rgba(244, 255, 251, 0.1)" : "rgba(16, 36, 28, 0.1)";
 
   return (
-    <Stack spacing={2.25} sx={{ p: { xs: 2, md: 2.5 }, height: "100%" }}>
-      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
-        <Typography
-          variant="body2"
-          sx={{ letterSpacing: "0.12em", fontSize: "0.68rem", color: "text.secondary", fontWeight: 600 }}
-        >
-          {t.flightWindow.flightStatus}
-        </Typography>
-        <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
-          <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "primary.main" }} />
-          <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.68rem", letterSpacing: "0.08em" }}>
-            {minutesSinceUpdate(sample.time, locale)}
-          </Typography>
-        </Stack>
-      </Stack>
+    <div className="flex h-full flex-col gap-5 p-4 md:p-5">
+      <div className="flex items-center justify-between">
+        <p className="eyebrow">{t.flightWindow.flightStatus}</p>
+        <div className="flex items-center gap-1.5 text-[0.68rem] tracking-wide text-muted-foreground uppercase">
+          <span className="size-1.5 rounded-full bg-primary" />
+          {minutesSinceUpdate(sample.time, locale)}
+        </div>
+      </div>
 
-      <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
-        <Box
+      <div className="flex items-center gap-4">
+        <div
           aria-label={t.common.scoreOutOf100(verdict.score)}
           role="img"
-          sx={{
-            width: 108,
-            height: 108,
-            borderRadius: "50%",
-            display: "grid",
-            placeItems: "center",
-            flexShrink: 0,
-            background: `conic-gradient(${tone.color} 0deg ${angle}deg, ${alpha(theme.palette.text.primary, 0.1)} ${angle}deg 360deg)`,
-            "&::before": {
-              content: '""',
-              position: "absolute",
-              width: 84,
-              height: 84,
-              borderRadius: "50%",
-              bgcolor: "var(--card)",
-            },
-            position: "relative",
+          className="relative grid size-[108px] shrink-0 place-items-center rounded-full"
+          style={{
+            background: `conic-gradient(${tone.color} 0deg ${angle}deg, ${ringTrack} ${angle}deg 360deg)`,
+            boxShadow: `0 0 24px ${tone.dim}`,
           }}
         >
-          <Typography sx={{ position: "relative", zIndex: 1, fontWeight: 800, fontSize: "1.65rem", color: tone.color }}>
+          <div className="absolute size-[84px] rounded-full bg-card" />
+          <span
+            className="relative z-10 text-[1.65rem] font-extrabold"
+            style={{ color: tone.color }}
+          >
             {ringStatusLabel(verdict.status, locale)}
-          </Typography>
-        </Box>
-        <Stack spacing={0.5} sx={{ minWidth: 0 }}>
-          <Typography variant="h2" sx={{ fontSize: "1.35rem" }}>
+          </span>
+        </div>
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-xl font-semibold leading-tight md:text-2xl">
             {verdictHeadline(verdict, locale)}
-          </Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          </h2>
+          <p className="text-sm text-muted-foreground">
             {favorableUntilMessage(hourly, verdict.status, snapshot.timezone, locale)}
-          </Typography>
-        </Stack>
-      </Stack>
+          </p>
+        </div>
+      </div>
 
-      <Box>
-        <Stack direction="row" sx={{ mb: 0.75, justifyContent: "space-between" }}>
-          <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.72rem", letterSpacing: "0.1em" }}>
-            {t.flightWindow.flightConfidence}
-          </Typography>
-          <Typography variant="body2" sx={{ fontWeight: 700 }}>{percentLabel(verdict.score, locale)}</Typography>
-        </Stack>
-        <LinearProgress
-          variant="determinate"
-          value={verdict.score}
-          sx={{
-            height: 8,
-            borderRadius: 999,
-            bgcolor: alpha(tone.color, 0.12),
-            "& .MuiLinearProgress-bar": { bgcolor: tone.color, borderRadius: 999 },
-          }}
-        />
-      </Box>
+      <div>
+        <div className="mb-2 flex items-center justify-between text-xs tracking-widest text-muted-foreground uppercase">
+          <span>{t.flightWindow.flightConfidence}</span>
+          <span className="font-bold text-foreground">{percentLabel(verdict.score, locale)}</span>
+        </div>
+        <Progress value={verdict.score} className="h-2 bg-[color-mix(in_srgb,var(--primary)_12%,transparent)]" />
+      </div>
 
-      <Box
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-          gap: 0,
-          border: "1px solid var(--border-flight)",
-          borderRadius: `${tokens.innerRadius}px`,
-          overflow: "hidden",
-          bgcolor: "var(--card)",
-        }}
+      <div
+        className="grid grid-cols-3 overflow-hidden rounded-2xl border border-[var(--border-flight)] bg-card"
+        style={{ borderRadius: tokens.innerRadius }}
       >
         <MetricCell
-          icon={<AirIcon sx={{ fontSize: 18 }} />}
+          icon={<Wind className="size-4" />}
           label={t.flightWindow.wind}
           value={numberLabel(sample.windSpeed, "km/h", 0, locale)}
           sub={`${windDirectionLabel(sample.windDirection, locale)} · ${t.flightWindow.gustsLabel(numberLabel(sample.windGusts, "km/h", 0, locale))}`}
         />
         <MetricCell
-          icon={<CloudQueueIcon sx={{ fontSize: 18 }} />}
+          icon={<Cloud className="size-4" />}
           label={t.flightWindow.cloudBase}
           value={cloudDisplay.primary}
           sub={cloudDisplay.secondary}
           bordered
         />
         <MetricCell
-          icon={<VisibilityIcon sx={{ fontSize: 18 }} />}
+          icon={<Eye className="size-4" />}
           label={t.flightWindow.visibility}
           value={distanceKm(sample.visibility, locale)}
           sub={visibilityClarityLabel(sample.visibility, locale)}
           bordered
         />
-      </Box>
+      </div>
 
-      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-        <Stack direction="row" sx={{ mb: 1.25, justifyContent: "space-between", alignItems: "center" }}>
-          <Typography variant="body2" sx={{ letterSpacing: "0.12em", fontSize: "0.68rem", color: "text.secondary", fontWeight: 600 }}>
-            {t.flightWindow.next6Hours}
-          </Typography>
-          <Box
-            component="button"
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="mb-3 flex items-center justify-between">
+          <p className="eyebrow">{t.flightWindow.next6Hours}</p>
+          <Button
             type="button"
+            variant="link"
+            className="h-auto gap-0.5 p-0 text-sm font-semibold"
             onClick={onOpenFullForecast}
-            sx={{
-              border: "none",
-              bgcolor: "transparent",
-              color: "primary.main",
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 0.25,
-              font: "inherit",
-              fontWeight: 650,
-              p: 0,
-            }}
           >
             {t.flightWindow.fullForecast}
-            <ChevronRightIcon sx={{ fontSize: 18 }} />
-          </Box>
-        </Stack>
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
 
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: `repeat(${Math.max(slots.length, 1)}, minmax(0, 1fr))`,
-            gap: 1,
-            alignItems: "end",
-            flex: 1,
-            minHeight: 140,
-          }}
+        <div
+          className="grid min-h-[140px] flex-1 items-end gap-2"
+          style={{ gridTemplateColumns: `repeat(${Math.max(slots.length, 1)}, minmax(0, 1fr))` }}
         >
           {slots.map((slot) => {
             const barHeight = slot.windMs === null ? 8 : 24 + (slot.windMs / maxWindMs) * 72;
             const barColor = slot.barTone === "ideal" ? tokens.accent : tokens.amber;
             return (
-              <Stack key={slot.sample.time} spacing={0.75} sx={{ height: "100%", alignItems: "center" }}>
-                <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>
+              <div key={slot.sample.time} className="flex h-full flex-col items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">
                   {slot.temperature === null ? "—" : `${Math.round(slot.temperature)}°`}
-                </Typography>
-                <Box sx={{ flex: 1, display: "flex", alignItems: "flex-end", width: "100%", justifyContent: "center" }}>
-                  <Box
-                    sx={{
-                      width: "42%",
-                      maxWidth: 28,
-                      height: barHeight,
-                      borderRadius: 999,
-                      bgcolor: barColor,
-                      opacity: slot.barTone === "ideal" ? 0.95 : 0.85,
-                    }}
+                </span>
+                <div className="flex w-full flex-1 items-end justify-center">
+                  <div
+                    className={cn(
+                      "w-[42%] max-w-7 rounded-full",
+                      slot.barTone === "ideal" ? "opacity-95 shadow-[0_0_12px_var(--accent)]" : "opacity-85",
+                    )}
+                    style={{ height: barHeight, backgroundColor: barColor }}
                   />
-                </Box>
-                <Typography variant="body2" sx={{ fontSize: "0.72rem", color: "text.secondary" }}>
-                  {slot.label}
-                </Typography>
-                <Typography sx={{ fontWeight: 700, fontSize: "0.85rem" }}>
+                </div>
+                <span className="text-[0.72rem] text-muted-foreground">{slot.label}</span>
+                <span className="telemetry text-sm font-bold">
                   {slot.windMs === null ? "—" : slot.windMs.toFixed(1)}
-                </Typography>
-              </Stack>
+                </span>
+              </div>
             );
           })}
-        </Box>
+        </div>
 
-        <Stack direction="row" spacing={2} sx={{ mt: 1.5 }}>
+        <div className="mt-4 flex gap-4">
           <LegendDot color={tokens.accent} label={t.flightWindow.idealWindow} />
           <LegendDot color={tokens.amber} label={t.flightWindow.increasingWind} />
-        </Stack>
-      </Box>
-    </Stack>
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -265,32 +206,19 @@ const MetricCell = ({
   sub: string;
   bordered?: boolean;
 }) => (
-  <Stack
-    spacing={0.75}
-    sx={{
-      p: 1.5,
-      borderLeft: bordered ? "1px solid var(--border-flight)" : undefined,
-      minWidth: 0,
-    }}
-  >
-    <Stack direction="row" spacing={0.5} sx={{ color: "text.secondary", alignItems: "center" }}>
+  <div className={cn("min-w-0 space-y-1.5 p-3", bordered && "border-l border-[var(--border-flight)]")}>
+    <div className="flex items-center gap-1 text-muted-foreground">
       {icon}
-      <Typography variant="body2" sx={{ fontSize: "0.65rem", letterSpacing: "0.1em" }}>
-        {label}
-      </Typography>
-    </Stack>
-    <Typography sx={{ fontWeight: 700, fontSize: "1.05rem", lineHeight: 1.2 }}>{value}</Typography>
-    <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.75rem", lineHeight: 1.3 }}>
-      {sub}
-    </Typography>
-  </Stack>
+      <span className="text-[0.65rem] tracking-widest uppercase">{label}</span>
+    </div>
+    <p className="telemetry text-base font-bold leading-tight">{value}</p>
+    <p className="text-xs leading-snug text-muted-foreground">{sub}</p>
+  </div>
 );
 
 const LegendDot = ({ color, label }: { color: string; label: string }) => (
-  <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
-    <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: color }} />
-    <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.75rem" }}>
-      {label}
-    </Typography>
-  </Stack>
+  <div className="flex items-center gap-2">
+    <span className="size-2 rounded-full" style={{ backgroundColor: color }} />
+    <span className="text-xs text-muted-foreground">{label}</span>
+  </div>
 );

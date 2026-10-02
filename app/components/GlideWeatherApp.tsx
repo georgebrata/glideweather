@@ -1,9 +1,10 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { Alert, Box, Skeleton, Stack, Typography } from "@mui/material";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Alert, AlertDescription } from "@/app/components/ui/alert";
+import { Skeleton } from "@/app/components/ui/skeleton";
 import { getTranslations } from "../i18n";
 import {
   parseUserPreferences,
@@ -36,15 +37,45 @@ import {
   writeThemeMode,
 } from "./dashboard/themeStore";
 
-export default function GlideWeatherApp() {
+type GlideWeatherAppProps = {
+  authEnabled: boolean;
+};
+
+export default function GlideWeatherApp({ authEnabled: authOn }: GlideWeatherAppProps) {
   return (
     <AppProviders>
-      <DashboardRoot />
+      {authOn ? <DashboardRootWithAuth /> : <DashboardRootPublic />}
     </AppProviders>
   );
 }
 
-function DashboardRoot() {
+function DashboardRootPublic() {
+  const { locale } = useLocaleText();
+  const themeMode = useSyncExternalStore(subscribeThemeMode, readInitialThemeMode, getServerThemeMode);
+  const setLocale = useCallback((nextLocale: typeof locale) => {
+    writeLocale(nextLocale);
+  }, []);
+
+  const toggleThemeMode = useCallback(() => {
+    const nextMode: ThemeMode = themeMode === "dark" ? "light" : "dark";
+    writeThemeMode(nextMode);
+  }, [themeMode]);
+
+  return (
+    <FlightWindowDashboard
+      authEnabled={false}
+      authLoaded={true}
+      isSignedIn={false}
+      user={null}
+      locale={locale}
+      setLocale={setLocale}
+      themeMode={themeMode}
+      toggleThemeMode={toggleThemeMode}
+    />
+  );
+}
+
+function DashboardRootWithAuth() {
   const { locale } = useLocaleText();
   const { isLoaded: authLoaded, isSignedIn, user } = useUser();
   const themeMode = useSyncExternalStore(subscribeThemeMode, readInitialThemeMode, getServerThemeMode);
@@ -62,6 +93,7 @@ function DashboardRoot() {
 
   return (
     <FlightWindowDashboard
+      authEnabled={true}
       authLoaded={authLoaded}
       isSignedIn={isSignedIn ?? false}
       user={user}
@@ -74,6 +106,7 @@ function DashboardRoot() {
 }
 
 function FlightWindowDashboard({
+  authEnabled,
   authLoaded,
   isSignedIn,
   user,
@@ -82,6 +115,7 @@ function FlightWindowDashboard({
   themeMode,
   toggleThemeMode,
 }: {
+  authEnabled: boolean;
   authLoaded: boolean;
   isSignedIn: boolean;
   user: ReturnType<typeof useUser>["user"];
@@ -210,16 +244,10 @@ function FlightWindowDashboard({
     : null;
 
   return (
-    <Box
-      component="main"
-      sx={{
-        minHeight: "100vh",
-        bgcolor: "background.default",
-        color: "text.primary",
-      }}
-    >
-      <Stack spacing={2.5} sx={{ mx: "auto", maxWidth: 1280, px: { xs: 2, md: 3 }, py: { xs: 2.5, md: 3.5 } }}>
+    <main className="nocturne-canvas min-h-screen text-foreground">
+      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 md:px-6 md:py-8">
         <AppHeader
+          authEnabled={authEnabled}
           locating={locating}
           onRequestLocation={requestLocation}
           onSelectLocation={selectLocation}
@@ -234,25 +262,29 @@ function FlightWindowDashboard({
         />
 
         {locationNotice ? (
-          <Alert severity="warning" onClose={() => setLocationNotice(null)}>
-            {locationNotice === "unavailable" ? t.location.unavailable : t.location.permissionDenied}
+          <Alert variant="default" className="border-[var(--border-flight)] bg-card">
+            <AlertDescription className="flex items-center justify-between gap-3">
+              <span>
+                {locationNotice === "unavailable" ? t.location.unavailable : t.location.permissionDenied}
+              </span>
+              <button
+                type="button"
+                className="text-sm font-medium text-primary"
+                onClick={() => setLocationNotice(null)}
+              >
+                {t.language.close}
+              </button>
+            </AlertDescription>
           </Alert>
         ) : null}
 
-        <Box
-          sx={{
-            border: "1px solid var(--border-flight)",
-            borderRadius: `${tokens.shellRadius}px`,
-            bgcolor: "background.paper",
-            overflow: "hidden",
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", lg: "58fr 42fr" },
-            minHeight: { xs: "auto", lg: 560 },
-          }}
+        <div
+          className="instrument-console grid min-h-0 lg:min-h-[560px] lg:grid-cols-[58fr_42fr]"
+          style={{ borderRadius: tokens.shellRadius }}
         >
-          <Box sx={{ minHeight: { xs: 320, lg: "auto" } }}>
-            {(!authLoaded || !initialLocationReady || locating) && !location ? (
-              <Skeleton variant="rectangular" height={420} />
+          <div className="min-h-[320px] lg:min-h-0">
+            {((!authLoaded || !initialLocationReady || locating) && !location) ? (
+              <Skeleton className="h-[420px] w-full rounded-none" />
             ) : (
               <FlightMap
                 location={location}
@@ -261,8 +293,8 @@ function FlightWindowDashboard({
                 onOpenSites={() => setSitesOpen(true)}
               />
             )}
-          </Box>
-          <Box sx={{ borderTop: { xs: "1px solid var(--border-flight)", lg: "none" }, borderLeft: { lg: "1px solid var(--border-flight)" } }}>
+          </div>
+          <div className="border-t border-[var(--border-flight)] lg:border-t-0 lg:border-l">
             <FlightStatusPanel
               snapshot={currentQuery.data}
               forecast={todayForecastQuery.data}
@@ -270,21 +302,17 @@ function FlightWindowDashboard({
               loading={locating || currentQuery.isLoading || !location}
               onOpenFullForecast={() => setForecastOpen(true)}
             />
-          </Box>
-        </Box>
+          </div>
+        </div>
 
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ pt: 0.5, justifyContent: "space-between" }}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-            <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "primary.main" }} />
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              {modelUpdatedLabel ?? t.flightWindow.footerAttribution}
-            </Typography>
-          </Stack>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Open-Meteo
-          </Typography>
-        </Stack>
-      </Stack>
+        <div className="flex flex-col justify-between gap-2 pt-1 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span className="size-1.5 rounded-full bg-primary" />
+            <span>{modelUpdatedLabel ?? t.flightWindow.footerAttribution}</span>
+          </div>
+          <span className="text-sm text-muted-foreground">Open-Meteo</span>
+        </div>
+      </div>
 
       {location ? (
         <ForecastDrawer
@@ -304,6 +332,6 @@ function FlightWindowDashboard({
         location={location}
         onSelectLocation={selectLocation}
       />
-    </Box>
+    </main>
   );
 }
