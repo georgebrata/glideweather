@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { VERDICT_TITLES } from "../brand";
 
 export type LocationChoice = {
   id: string;
@@ -419,7 +420,7 @@ export async function fetchDayForecast(
     sample: null,
     verdict: {
       status: "no-go" as const,
-      title: "Nu există fereastră de lumină",
+      title: VERDICT_TITLES.noDaylight,
       score: 0,
       reasons: ["Prognoza nu a returnat ore cu lumină naturală pentru data selectată."],
       cautions: [],
@@ -510,7 +511,7 @@ export function evaluateFlight(sample: WeatherSample): FlightVerdict {
   if (hard.length > 0) {
     return {
       status: "no-go",
-      title: "Nu e parapantabil",
+      title: VERDICT_TITLES.noGo,
       score: Math.min(safeScore, 44),
       reasons: hard,
       cautions,
@@ -520,7 +521,7 @@ export function evaluateFlight(sample: WeatherSample): FlightVerdict {
   if (cautions.length > 0 || safeScore < 78) {
     return {
       status: "marginal",
-      title: "La limită",
+      title: VERDICT_TITLES.marginal,
       score: Math.min(safeScore, 74),
       reasons: cautions.slice(0, 3),
       cautions: cautions.slice(3),
@@ -529,7 +530,7 @@ export function evaluateFlight(sample: WeatherSample): FlightVerdict {
 
   return {
     status: "good",
-    title: "Parapantabil",
+    title: VERDICT_TITLES.good,
     score: safeScore,
     reasons: ["Vântul, rafalele, precipitațiile, vizibilitatea și instabilitatea arată acceptabil."],
     cautions,

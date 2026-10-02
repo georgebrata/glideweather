@@ -1,20 +1,19 @@
 import type { Metadata } from "next";
+import { MARK_SRC, PAGE_DESCRIPTION, PAGE_TITLE } from "./brand";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Parapantabil.ro | Verificare meteo de zbor",
-  description:
-    "Consolă meteo în limba română pentru verificarea condițiilor parapantabile.",
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
   icons: {
-    icon: "/parapantabil-logo.png",
-    shortcut: "/parapantabil-logo.png",
-    apple: "/parapantabil-logo.png",
+    icon: MARK_SRC,
+    shortcut: MARK_SRC,
+    apple: MARK_SRC,
   },
   openGraph: {
-    title: "Parapantabil.ro | Verificare meteo de zbor",
-    description:
-      "Consolă meteo în limba română pentru verificarea condițiilor parapantabile.",
-    images: ["/parapantabil-logo.png"],
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    images: [MARK_SRC],
   },
 };
 

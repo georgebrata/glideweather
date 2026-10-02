@@ -1,6 +1,6 @@
-# Paraglider Weather Check (Parapantabil OS)
+# WindWatch
 
-**Paraglider Weather Check** is a specialized real-time weather console built for paragliding pilots. It aggregates weather data, air quality metrics, and geocoding from Open-Meteo to provide an immediate, conservative safety evaluation ("Parapantabil", "La limită", or "Nu e parapantabil") for launch decisions and flight planning.
+**WindWatch** is a real-time weather console for paragliding pilots. It aggregates weather, air quality, and geocoding from Open-Meteo into a conservative launch verdict ("Poți zbura", "La limită", or "Nu zbura") for flight planning.
 
 ---
 
@@ -15,9 +15,9 @@ This application synthesizes key flight parameters into a single actionable sign
 ## Key Features
 
 - **Real-Time Flight Verdict & Scoring (0–100):** Evaluates live weather samples against conservative paragliding safety thresholds:
-  - **Parapantabil (Good Window):** Favorable wind, low gust spread, high visibility, and stable atmosphere.
+  - **Poți zbura (Good Window):** Favorable wind, low gust spread, high visibility, and stable atmosphere.
   - **La limită (Marginal):** Borderline conditions or moderate gust spreads requiring caution.
-  - **Nu e parapantabil (No-Go):** Excessive wind/gusts, severe turbulence potential, precipitation, low visibility, thunderstorm risk, or high CAPE (> 1500 J/kg).
+  - **Nu zbura (No-Go):** Excessive wind/gusts, severe turbulence potential, precipitation, low visibility, thunderstorm risk, or high CAPE (> 1500 J/kg).
 - **Location Detection & Search:**
   - Auto-locates takeoff sites using browser Geolocation (GPS).
   - Search any spot or locality worldwide using Open-Meteo Geocoding.
@@ -29,7 +29,7 @@ This application synthesizes key flight parameters into a single actionable sign
   - Gust spread calculator.
   - Atmospheric instability (CAPE) monitoring.
   - Visibility, pressure, humidity, air quality (AQI, PM2.5, PM10), and UV index.
-- **Theme Support:** Dark Mode and Light Mode with glassmorphic UI and animated telemetry visualizers.
+- **Theme Support:** Dark mode and light mode, with the launch verdict, wind dial, and launch windows kept in view.
 
 ---
 
@@ -70,7 +70,7 @@ This application synthesizes key flight parameters into a single actionable sign
 1. Clone the repository:
    ```bash
    git clone <repository-url>
-   cd paraglider-weather-check
+   cd windwatch
    ```
 
 2. Install dependencies:
@@ -100,9 +100,10 @@ npm run build
 ```text
 ├── app/
 │   ├── components/
-│   │   └── ParagliderWeatherApp.tsx  # Main dashboard UI, theme toggle, location controls, metrics
+│   │   └── WindWatchApp.tsx          # Dashboard: location controls, verdict, launch windows
 │   ├── lib/
 │   │   └── weather.ts                # API client, Zod schemas, flight decision algorithm & types
+│   ├── brand.ts                      # Product name, verdict titles, metadata copy
 │   ├── globals.css                   # Global styles & Tailwind import
 │   ├── layout.tsx                    # Root Next.js layout
 │   └── page.tsx                      # Entry home page
