@@ -5,14 +5,14 @@ export const ro = {
     documentLang: "ro",
     localeName: "Romanian",
     nativeName: "Română",
-    title: "WindWatch · Meteo de zbor",
+    title: "GlideWeather · Meteo de zbor",
     description:
       "Verdict de lansare pentru parapantă: vânt, rafale, vizibilitate și instabilitate.",
   },
   common: {
     notAvailable: "n/d",
     scoreDenominator: "/100",
-    scoreOutOf100: (score: number) => `Scor WindWatch ${score} din 100`,
+    scoreOutOf100: (score: number) => `Scor GlideWeather ${score} din 100`,
   },
   language: {
     label: "Limbă",
@@ -20,7 +20,7 @@ export const ro = {
     clear: "Golește",
     close: "Închide",
     open: "Deschide",
-    noOptions: "Nicio țară europeană găsită",
+    noOptions: "Nicio țară găsită",
   },
   theme: {
     enableLight: "Activează tema luminoasă",
@@ -52,8 +52,8 @@ export const ro = {
     myPosition: "Poziția mea",
   },
   header: {
-    productChip: "Parapantabil OS",
-    headline: "Parapantabil?",
+    productChip: "GlideWeather",
+    headline: "GlideWeather",
     intro:
       "Consolă meteo pentru piloți parapantă: vânt, rafale, vizibilitate, instabilitate și fereastră de lansare citite ca un singur semnal.",
     refreshTooltip: "Recalibrează datele meteo",
@@ -83,7 +83,7 @@ export const ro = {
     standby: "sistem în așteptare",
     title: "Calibrează zona de zbor",
     body:
-      "Introdu o localitate, o zonă de decolare sau activează poziția. Consola va sintetiza condițiile într-un verdict parapantabil, cu riscurile critice la vedere.",
+      "Introdu o localitate, o zonă de decolare sau activează poziția. Aplicația va sintetiza condițiile într-un verdict de lansare, cu riscurile critice la vedere.",
     wind: "Vânt",
     gusts: "Rafale",
     visibility: "Vizibilitate",
@@ -241,6 +241,6 @@ export const ro = {
     windowsTitle: "Ferestre de lansare",
     windowsSubtitle: "Orele de lumină sortate după scor",
     footer:
-      "WindWatch · Date Open-Meteo · Ajutor de decizie, nu autorizare de zbor.",
+      "GlideWeather · Date Open-Meteo · Ajutor de decizie, nu autorizare de zbor.",
   },
 } satisfies LocaleText;

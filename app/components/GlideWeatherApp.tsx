@@ -45,16 +45,23 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { LEGACY_THEME_STORAGE_KEY, PRODUCT_NAME, THEME_STORAGE_KEY } from "../brand";
+import {
+  LEGACY_LOCALE_STORAGE_KEYS,
+  LEGACY_THEME_STORAGE_KEYS,
+  LOCALE_STORAGE_KEY,
+  PRODUCT_NAME,
+  THEME_STORAGE_KEY,
+} from "../brand";
 import {
   DEFAULT_LOCALE,
-  EUROPEAN_LOCALE_OPTIONS,
+  LOCALE_OPTIONS,
   getIntlLocale,
   getLocaleButtonLabel,
   getLocaleOption,
   getLocaleOptionLabel,
   getTranslations,
   isAppLocale,
+  matchBrowserLocale,
   type AppLocale,
   type LocaleText,
 } from "../i18n";
@@ -78,7 +85,6 @@ import {
 
 type ThemeMode = "dark" | "light";
 
-const LOCALE_STORAGE_KEY = "parapantabil-locale";
 const themeModeListeners = new Set<() => void>();
 const localeListeners = new Set<() => void>();
 let memoryThemeMode: ThemeMode | null = null;
@@ -218,8 +224,10 @@ function readStoredThemeMode(): ThemeMode | null {
     const storedMode = window.localStorage.getItem(THEME_STORAGE_KEY);
     if (storedMode === "dark" || storedMode === "light") return storedMode;
 
-    const legacyMode = window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY);
-    if (legacyMode !== "dark" && legacyMode !== "light") return null;
+    const legacyMode = LEGACY_THEME_STORAGE_KEYS.map((key) => window.localStorage.getItem(key)).find(
+      (value): value is ThemeMode => value === "dark" || value === "light",
+    );
+    if (!legacyMode) return null;
 
     if (!legacyThemeMigrated) {
       legacyThemeMigrated = true;
@@ -250,7 +258,12 @@ function subscribeThemeMode(listener: () => void) {
 
   themeModeListeners.add(listener);
   const handleStorage = (event: StorageEvent) => {
-    if (event.key === THEME_STORAGE_KEY || event.key === LEGACY_THEME_STORAGE_KEY) listener();
+    if (
+      event.key === THEME_STORAGE_KEY ||
+      LEGACY_THEME_STORAGE_KEYS.some((key) => key === event.key)
+    ) {
+      listener();
+    }
   };
 
   window.addEventListener("storage", handleStorage);
@@ -306,7 +319,19 @@ function readInitialLocale(): AppLocale {
     const storedLocale = window.localStorage.getItem(LOCALE_STORAGE_KEY);
     if (isAppLocale(storedLocale)) return storedLocale;
 
-    const browserLocale = window.navigator.languages.find(isAppLocale);
+    const legacyLocale = LEGACY_LOCALE_STORAGE_KEYS.map((key) => window.localStorage.getItem(key)).find(isAppLocale);
+    if (legacyLocale) {
+      try {
+        window.localStorage.setItem(LOCALE_STORAGE_KEY, legacyLocale);
+      } catch {
+        // The saved language still applies when the new key cannot be written.
+      }
+      return legacyLocale;
+    }
+
+    const browserLocale = window.navigator.languages
+      .map((language) => matchBrowserLocale(language))
+      .find((language): language is AppLocale => language !== null);
     return browserLocale ?? DEFAULT_LOCALE;
   } catch {
     return DEFAULT_LOCALE;
@@ -318,7 +343,9 @@ function subscribeLocale(listener: () => void) {
 
   localeListeners.add(listener);
   const handleStorage = (event: StorageEvent) => {
-    if (event.key === LOCALE_STORAGE_KEY) listener();
+    if (event.key === LOCALE_STORAGE_KEY || LEGACY_LOCALE_STORAGE_KEYS.some((key) => key === event.key)) {
+      listener();
+    }
   };
 
   window.addEventListener("storage", handleStorage);
@@ -345,7 +372,7 @@ function writeLocale(locale: AppLocale) {
   localeListeners.forEach((listener) => listener());
 }
 
-export default function WindWatchApp() {
+export default function GlideWeatherApp() {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -381,7 +408,7 @@ export default function WindWatchApp() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <LocaleContext.Provider value={{ locale, t }}>
-          <WindWatchDashboard
+          <GlideWeatherDashboard
             locale={locale}
             setLocale={setLocale}
             themeMode={themeMode}
@@ -393,7 +420,7 @@ export default function WindWatchApp() {
   );
 }
 
-function WindWatchDashboard({
+function GlideWeatherDashboard({
   locale,
   setLocale,
   themeMode,
@@ -1355,7 +1382,7 @@ function LanguagePicker({
         onChange={(_, nextValue) => setLocale(nextValue.code)}
         onInputChange={() => undefined}
         openText={t.language.open}
-        options={EUROPEAN_LOCALE_OPTIONS}
+        options={LOCALE_OPTIONS}
         renderInput={(params) => (
           <TextField
             {...params}

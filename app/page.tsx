@@ -1,5 +1,5 @@
-import WindWatchApp from "./components/WindWatchApp";
+import GlideWeatherApp from "./components/GlideWeatherApp";
 
 export default function Home() {
-  return <WindWatchApp />;
+  return <GlideWeatherApp />;
 }

@@ -3,14 +3,14 @@ export const en = {
     documentLang: "en",
     localeName: "English",
     nativeName: "English",
-    title: "WindWatch · Flight weather",
+    title: "GlideWeather · Flight weather",
     description:
       "Launch verdict for paragliding: wind, gusts, visibility, and instability.",
   },
   common: {
     notAvailable: "n/a",
     scoreDenominator: "/100",
-    scoreOutOf100: (score: number) => `WindWatch score ${score} out of 100`,
+    scoreOutOf100: (score: number) => `GlideWeather score ${score} out of 100`,
   },
   language: {
     label: "Language",
@@ -18,7 +18,7 @@ export const en = {
     clear: "Clear",
     close: "Close",
     open: "Open",
-    noOptions: "No European country found",
+    noOptions: "No country found",
   },
   theme: {
     enableLight: "Enable light theme",
@@ -50,8 +50,8 @@ export const en = {
     myPosition: "My position",
   },
   header: {
-    productChip: "Parapantabil OS",
-    headline: "Parapantabil?",
+    productChip: "GlideWeather",
+    headline: "GlideWeather",
     intro:
       "Weather console for paraglider pilots: wind, gusts, visibility, instability, and launch window read as one signal.",
     refreshTooltip: "Recalibrate weather data",
@@ -239,7 +239,7 @@ export const en = {
     windowsTitle: "Launch windows",
     windowsSubtitle: "Daylight hours sorted by score",
     footer:
-      "WindWatch · Open-Meteo data · Decision aid, not flight authorization.",
+      "GlideWeather · Open-Meteo data · Decision aid, not flight authorization.",
   },
 };
 

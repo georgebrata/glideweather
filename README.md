@@ -1,6 +1,9 @@
-# WindWatch
+# GlideWeather
 
-**WindWatch** is a real-time weather console for paragliding pilots. It aggregates weather, air quality, and geocoding from Open-Meteo into a conservative launch verdict ("Poți zbura", "La limită", or "Nu zbura") for flight planning.
+**GlideWeather** is a real-time weather console for paragliding pilots. It aggregates weather, air quality, and geocoding from Open-Meteo into a conservative launch verdict. The interface is English by default and Romanian for Romanian locales. Place search works worldwide.
+
+- Production: [glideweather.app](https://glideweather.app)
+- Test: [glideweather.vercel.app](https://glideweather.vercel.app)
 
 ---
 
@@ -29,6 +32,7 @@ This application synthesizes key flight parameters into a single actionable sign
   - Gust spread calculator.
   - Atmospheric instability (CAPE) monitoring.
   - Visibility, pressure, humidity, air quality (AQI, PM2.5, PM10), and UV index.
+- **Languages:** English interface by default, full Romanian copy, and a country picker covering Europe plus major regions worldwide. Geocoding uses the selected language when Open-Meteo supports it.
 - **Theme Support:** Dark mode and light mode, with the launch verdict, wind dial, and launch windows kept in view.
 
 ---
@@ -70,7 +74,7 @@ This application synthesizes key flight parameters into a single actionable sign
 1. Clone the repository:
    ```bash
    git clone <repository-url>
-   cd windwatch
+   cd glideweather
    ```
 
 2. Install dependencies:
@@ -100,7 +104,7 @@ npm run build
 ```text
 ├── app/
 │   ├── components/
-│   │   └── WindWatchApp.tsx          # Dashboard: location controls, verdict, launch windows
+│   │   └── GlideWeatherApp.tsx       # Dashboard: location controls, verdict, launch windows
 │   ├── lib/
 │   │   └── weather.ts                # API client, Zod schemas, flight decision algorithm & types
 │   ├── brand.ts                      # Product name, verdict titles, metadata copy
