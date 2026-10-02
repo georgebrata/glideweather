@@ -3,6 +3,7 @@
 import AirIcon from "@mui/icons-material/Air";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import LanguageIcon from "@mui/icons-material/Language";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
 import PlaceIcon from "@mui/icons-material/Place";
@@ -33,8 +34,29 @@ import {
 } from "@mui/material";
 import { alpha, createTheme, type Theme, useTheme } from "@mui/material/styles";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { type ReactNode, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { FOOTER_LINE, LEGACY_THEME_STORAGE_KEY, PRODUCT_NAME, THEME_STORAGE_KEY } from "../brand";
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { LEGACY_THEME_STORAGE_KEY, PRODUCT_NAME, THEME_STORAGE_KEY } from "../brand";
+import {
+  DEFAULT_LOCALE,
+  EUROPEAN_LOCALE_OPTIONS,
+  getIntlLocale,
+  getLocaleButtonLabel,
+  getLocaleOption,
+  getLocaleOptionLabel,
+  getTranslations,
+  isAppLocale,
+  type AppLocale,
+  type LocaleText,
+} from "../i18n";
 import {
   CurrentSnapshot,
   DayForecast,
@@ -55,9 +77,27 @@ import {
 
 type ThemeMode = "dark" | "light";
 
+const LOCALE_STORAGE_KEY = "parapantabil-locale";
 const themeModeListeners = new Set<() => void>();
+const localeListeners = new Set<() => void>();
 let memoryThemeMode: ThemeMode | null = null;
+let memoryLocale: AppLocale | null = null;
 let legacyThemeMigrated = false;
+
+type LocaleContextValue = {
+  locale: AppLocale;
+  t: LocaleText;
+};
+
+const LocaleContext = createContext<LocaleContextValue | null>(null);
+
+function useLocaleText() {
+  const value = useContext(LocaleContext);
+  if (!value) {
+    throw new Error("LocaleContext is missing");
+  }
+  return value;
+}
 
 const POPULAR_SPOTS: LocationChoice[] = [
   { id: "spot-bunloc", name: "Bunloc", detail: "Săcele, Brașov", latitude: 45.5883, longitude: 25.6421, source: "search" },
@@ -249,12 +289,59 @@ function gustSpreadOf(sample: WeatherSample) {
   return sample.windGusts - sample.windSpeed;
 }
 
-function distanceLabel(value: number | null) {
-  if (value === null) return "n/d";
-  return `${new Intl.NumberFormat("ro-RO", {
+function distanceLabel(value: number | null, locale: AppLocale) {
+  if (value === null) return getTranslations(locale).common.notAvailable;
+  return `${new Intl.NumberFormat(getIntlLocale(locale), {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   }).format(value / 1000)} km`;
+}
+
+function readInitialLocale(): AppLocale {
+  if (memoryLocale) return memoryLocale;
+  if (typeof window === "undefined") return DEFAULT_LOCALE;
+
+  try {
+    const storedLocale = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+    if (isAppLocale(storedLocale)) return storedLocale;
+
+    const browserLocale = window.navigator.languages.find(isAppLocale);
+    return browserLocale ?? DEFAULT_LOCALE;
+  } catch {
+    return DEFAULT_LOCALE;
+  }
+}
+
+function subscribeLocale(listener: () => void) {
+  if (typeof window === "undefined") return () => undefined;
+
+  localeListeners.add(listener);
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === LOCALE_STORAGE_KEY) listener();
+  };
+
+  window.addEventListener("storage", handleStorage);
+
+  return () => {
+    localeListeners.delete(listener);
+    window.removeEventListener("storage", handleStorage);
+  };
+}
+
+function getServerLocale(): AppLocale {
+  return DEFAULT_LOCALE;
+}
+
+function writeLocale(locale: AppLocale) {
+  memoryLocale = locale;
+
+  try {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+  } catch {
+    // Locale persistence is optional; the selected language still applies in memory.
+  }
+
+  localeListeners.forEach((listener) => listener());
 }
 
 export default function WindWatchApp() {
@@ -272,11 +359,17 @@ export default function WindWatchApp() {
     getServerThemeMode,
   );
   const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
+  const locale = useSyncExternalStore(subscribeLocale, readInitialLocale, getServerLocale);
+  const t = useMemo(() => getTranslations(locale), [locale]);
+  const setLocale = useCallback((nextLocale: AppLocale) => {
+    writeLocale(nextLocale);
+  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = themeMode;
     document.documentElement.style.colorScheme = themeMode;
-  }, [themeMode]);
+    document.documentElement.lang = t.meta.documentLang;
+  }, [t.meta.documentLang, themeMode]);
 
   const toggleThemeMode = useCallback(() => {
     writeThemeMode(themeMode === "dark" ? "light" : "dark");
@@ -286,19 +379,31 @@ export default function WindWatchApp() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <WindWatchDashboard themeMode={themeMode} toggleThemeMode={toggleThemeMode} />
+        <LocaleContext.Provider value={{ locale, t }}>
+          <WindWatchDashboard
+            locale={locale}
+            setLocale={setLocale}
+            themeMode={themeMode}
+            toggleThemeMode={toggleThemeMode}
+          />
+        </LocaleContext.Provider>
       </ThemeProvider>
     </QueryClientProvider>
   );
 }
 
 function WindWatchDashboard({
+  locale,
+  setLocale,
   themeMode,
   toggleThemeMode,
 }: {
+  locale: AppLocale;
+  setLocale: (locale: AppLocale) => void;
   themeMode: ThemeMode;
   toggleThemeMode: () => void;
 }) {
+  const { t } = useLocaleText();
   const [location, setLocation] = useState<LocationChoice | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [locating, setLocating] = useState(false);
@@ -307,9 +412,7 @@ function WindWatchDashboard({
 
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      setLocationNotice(
-        "Poziția browserului nu este disponibilă. Caută o zonă de decolare sau o localitate.",
-      );
+      setLocationNotice(t.location.unavailable);
       setLocation(null);
       return;
     }
@@ -320,7 +423,7 @@ function WindWatchDashboard({
         const { latitude, longitude } = position.coords;
         setLocation({
           id: `gps-${latitude.toFixed(4)}-${longitude.toFixed(4)}`,
-          name: "Poziția curentă",
+          name: t.location.currentPosition,
           detail: `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
           latitude,
           longitude,
@@ -332,7 +435,7 @@ function WindWatchDashboard({
       },
       () => {
         setLocationNotice(
-          "Permisiunea de localizare nu este activă. Caută manual o zonă de decolare sau o localitate.",
+          t.location.permissionDenied,
         );
         setLocation(null);
         setActiveTab(0);
@@ -340,7 +443,7 @@ function WindWatchDashboard({
       },
       { enableHighAccuracy: false, maximumAge: 1000 * 60 * 10, timeout: 10000 },
     );
-  }, []);
+  }, [t.location.currentPosition, t.location.permissionDenied, t.location.unavailable]);
 
   useEffect(() => {
     const timer = window.setTimeout(requestLocation, 0);
@@ -348,15 +451,15 @@ function WindWatchDashboard({
   }, [requestLocation]);
 
   const currentQuery = useQuery({
-    queryKey: ["current-weather", location?.latitude, location?.longitude],
-    queryFn: () => fetchCurrentSnapshot(location as LocationChoice),
+    queryKey: ["current-weather", location?.latitude, location?.longitude, locale],
+    queryFn: () => fetchCurrentSnapshot(location as LocationChoice, locale),
     enabled: Boolean(location),
     refetchInterval: 1000 * 60 * 12,
   });
 
   const searchQuery = useQuery({
-    queryKey: ["location-search", searchText],
-    queryFn: () => searchLocations(searchText),
+    queryKey: ["location-search", searchText, locale],
+    queryFn: () => searchLocations(searchText, locale),
     enabled: searchText.trim().length >= 3,
     staleTime: 1000 * 60 * 20,
   });
@@ -390,6 +493,8 @@ function WindWatchDashboard({
           searchText={searchText}
           setSearchText={setSearchText}
           snapshot={currentQuery.data}
+          locale={locale}
+          setLocale={setLocale}
           themeMode={themeMode}
           toggleThemeMode={toggleThemeMode}
         />
@@ -413,7 +518,7 @@ function WindWatchDashboard({
         ) : null}
 
         <Typography variant="body2" sx={{ color: "text.secondary", pt: 1 }}>
-          {FOOTER_LINE}
+          {t.console.footer}
         </Typography>
       </Stack>
     </Box>
@@ -432,6 +537,8 @@ function AppHeader({
   searchText,
   setSearchText,
   snapshot,
+  locale,
+  setLocale,
   themeMode,
   toggleThemeMode,
 }: {
@@ -446,11 +553,13 @@ function AppHeader({
   searchText: string;
   setSearchText: (value: string) => void;
   snapshot?: CurrentSnapshot;
+  locale: AppLocale;
+  setLocale: (locale: AppLocale) => void;
   themeMode: ThemeMode;
   toggleThemeMode: () => void;
 }) {
-  const themeToggleLabel =
-    themeMode === "dark" ? "Activează tema luminoasă" : "Activează tema întunecată";
+  const { t } = useLocaleText();
+  const themeToggleLabel = themeMode === "dark" ? t.theme.enableLight : t.theme.enableDark;
 
   return (
     <Stack component="header" spacing={1.5}>
@@ -476,32 +585,33 @@ function AppHeader({
         <Autocomplete
           sx={{ gridArea: "search" }}
           fullWidth
-          clearText="Golește"
-          closeText="Închide"
+          clearText={t.language.clear}
+          closeText={t.language.close}
           filterOptions={(options) => options}
           getOptionLabel={(option) =>
             typeof option === "string" ? option : [option.name, option.detail].filter(Boolean).join(", ")
           }
           inputValue={searchText}
           loading={searchFetching}
-          loadingText="Caut..."
-          noOptionsText="Nicio zonă găsită"
+          loadingText={t.header.searchLoading}
+          noOptionsText={t.header.searchEmpty}
           onChange={(_, nextValue) => {
             if (nextValue && typeof nextValue !== "string") onSelectLocation(nextValue);
           }}
           onInputChange={(_, nextValue) => setSearchText(nextValue)}
-          openText="Deschide"
+          openText={t.language.open}
           options={searchData}
           renderInput={(params) => (
             <TextField
               {...params}
-              label="Caută zonă / localitate"
-              placeholder="Brașov, Bunloc, Clopotiva..."
+              label={t.header.searchLabel}
+              placeholder={t.header.searchPlaceholder}
             />
           )}
         />
 
-        <Box sx={{ gridArea: "theme", justifySelf: "end" }}>
+        <Stack direction="row" spacing={1} sx={{ gridArea: "theme", justifySelf: "end", alignItems: "center" }}>
+          <LanguagePicker locale={locale} setLocale={setLocale} t={t} />
           <Tooltip title={themeToggleLabel}>
             <IconButton
               aria-label={themeToggleLabel}
@@ -514,7 +624,7 @@ function AppHeader({
               {themeMode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
             </IconButton>
           </Tooltip>
-        </Box>
+        </Stack>
       </Box>
 
       <Stack
@@ -527,12 +637,12 @@ function AppHeader({
             <Chip icon={<PlaceIcon />} label={location.name} variant="outlined" />
           ) : (
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Nicio zonă selectată
+              {t.console.noPlace}
             </Typography>
           )}
           {snapshot ? (
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              {formatTime(snapshot.sample.time, snapshot.timezone)}
+              {formatTime(snapshot.sample.time, snapshot.timezone, locale)}
             </Typography>
           ) : null}
         </Stack>
@@ -543,7 +653,7 @@ function AppHeader({
             onClick={onRequestLocation}
             disabled={locating}
           >
-            Poziția mea
+            {t.location.myPosition}
           </Button>
           <Button
             variant="outlined"
@@ -551,7 +661,7 @@ function AppHeader({
             onClick={onRefresh}
             disabled={!location || isFetching}
           >
-            Actualizează
+            {t.console.update}
           </Button>
         </Stack>
       </Stack>
@@ -568,6 +678,7 @@ function SiteShortcuts({
   location: LocationChoice | null;
   onSelectLocation: (location: LocationChoice) => void;
 }) {
+  const { t } = useLocaleText();
   const buttons = (
     <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: "wrap" }}>
       {POPULAR_SPOTS.map((spot) => {
@@ -597,7 +708,7 @@ function SiteShortcuts({
   return (
     <Accordion disableGutters elevation={0} sx={accordionSx}>
       <AccordionSummary expandIcon={<ExpandMoreIcon />} id="romania-sites-header" aria-controls="romania-sites">
-        <Typography sx={{ fontWeight: 700 }}>Zone din România</Typography>
+        <Typography sx={{ fontWeight: 700 }}>{t.console.romaniaSites}</Typography>
       </AccordionSummary>
       <AccordionDetails id="romania-sites">{buttons}</AccordionDetails>
     </Accordion>
@@ -617,6 +728,8 @@ function WeatherPanels({
   location: LocationChoice;
   setActiveTab: (value: number) => void;
 }) {
+  const { locale, t } = useLocaleText();
+
   return (
     <Stack spacing={2}>
       <Tabs
@@ -634,9 +747,9 @@ function WeatherPanels({
           },
         })}
       >
-        <Tab label="Acum" value={0} />
+        <Tab label={t.tabs.now} value={0} />
         {[1, 2, 3].map((offset) => (
-          <Tab key={offset} label={formatDateLabel(dateForOffset(offset))} value={offset} />
+          <Tab key={offset} label={formatDateLabel(dateForOffset(offset), locale)} value={offset} />
         ))}
       </Tabs>
 
@@ -668,10 +781,12 @@ function CurrentPanel({
   isFetching: boolean;
   queryError: Error | null;
 }) {
+  const { t } = useLocaleText();
+
   if (queryError) {
     return (
       <Alert severity="error" sx={alertSx("error")}>
-        Datele meteo live nu au putut fi încărcate: {queryError.message}
+        {t.current.loadError(queryError.message)}
       </Alert>
     );
   }
@@ -696,10 +811,11 @@ function CurrentDay({
   locating: boolean;
   location: LocationChoice;
 }) {
+  const { locale, t } = useLocaleText();
   const date = useMemo(() => dateForOffset(0), []);
   const forecastQuery = useQuery({
-    queryKey: ["day-forecast", location.latitude, location.longitude, date],
-    queryFn: () => fetchDayForecast(location, date),
+    queryKey: ["day-forecast", location.latitude, location.longitude, date, locale],
+    queryFn: () => fetchDayForecast(location, date, locale),
   });
   const snapshot = currentQuery.data;
   const detailSample = useMemo(() => {
@@ -722,7 +838,7 @@ function CurrentDay({
       />
       {forecastQuery.error ? (
         <Alert severity="error" sx={alertSx("error")}>
-          Ferestrele de azi nu au putut fi încărcate: {forecastQuery.error.message}
+          {t.console.windowsError(forecastQuery.error.message)}
         </Alert>
       ) : forecastQuery.isLoading || !forecastQuery.data ? (
         <Skeleton variant="rounded" height={88} />
@@ -743,10 +859,11 @@ function ForecastPanel({
   location: LocationChoice;
   offset: number;
 }) {
+  const { locale, t } = useLocaleText();
   const date = useMemo(() => dateForOffset(offset), [offset]);
   const forecastQuery = useQuery({
-    queryKey: ["day-forecast", location.latitude, location.longitude, date],
-    queryFn: () => fetchDayForecast(location, date),
+    queryKey: ["day-forecast", location.latitude, location.longitude, date, locale],
+    queryFn: () => fetchDayForecast(location, date, locale),
     enabled: active,
   });
 
@@ -754,7 +871,7 @@ function ForecastPanel({
   if (forecastQuery.error) {
     return (
       <Alert severity="error" sx={alertSx("error")}>
-        Prognoza nu a putut fi încărcată: {forecastQuery.error.message}
+        {t.forecast.loadError(forecastQuery.error.message)}
       </Alert>
     );
   }
@@ -767,7 +884,7 @@ function ForecastPanel({
     <Stack spacing={2}>
       <DailySummary forecast={forecast} />
       <VerdictPanel
-        contextTitle="Cea mai bună fereastră"
+        contextTitle={t.forecast.bestWindow}
         sample={sample}
         verdict={forecast.best.verdict}
       />
@@ -779,12 +896,13 @@ function ForecastPanel({
 }
 
 function DailySummary({ forecast }: { forecast: DayForecast }) {
+  const { locale, t } = useLocaleText();
   const parts = [
-    `Temperatură ${numberLabel(forecast.daily.temperatureMin, "C")} / ${numberLabel(forecast.daily.temperatureMax, "C")}`,
-    `Vânt max. ${numberLabel(forecast.daily.windSpeedMax, "km/h")}`,
-    `Rafală max. ${numberLabel(forecast.daily.windGustsMax, "km/h")}`,
-    `Ploaie ${percentLabel(forecast.daily.precipitationProbabilityMax)}`,
-    `${formatTime(forecast.daily.sunrise, forecast.timezone)}–${formatTime(forecast.daily.sunset, forecast.timezone)}`,
+    `${t.daily.temperature} ${numberLabel(forecast.daily.temperatureMin, "C", 0, locale)} / ${numberLabel(forecast.daily.temperatureMax, "C", 0, locale)}`,
+    `${t.daily.maxWind} ${numberLabel(forecast.daily.windSpeedMax, "km/h", 0, locale)}`,
+    `${t.daily.maxGust} ${numberLabel(forecast.daily.windGustsMax, "km/h", 0, locale)}`,
+    `${t.console.rain} ${percentLabel(forecast.daily.precipitationProbabilityMax, locale)}`,
+    `${formatTime(forecast.daily.sunrise, forecast.timezone, locale)}–${formatTime(forecast.daily.sunset, forecast.timezone, locale)}`,
   ];
 
   return (
@@ -804,7 +922,9 @@ function VerdictPanel({
   verdict: FlightVerdict;
 }) {
   const theme = useTheme();
+  const { locale, t } = useLocaleText();
   const tone = statusTone(verdict.status, theme.palette.mode);
+  const unavailable = t.common.notAvailable;
   const reasons = verdict.reasons.slice(0, 2);
 
   return (
@@ -851,9 +971,9 @@ function VerdictPanel({
             </RiskLine>
           ))}
           <Stack direction="row" spacing={2} useFlexGap sx={{ flexWrap: "wrap" }}>
-            <Fact icon={<AirIcon fontSize="small" />} label="Vânt" value={sample ? numberLabel(sample.windSpeed, "km/h") : "n/d"} />
-            <Fact icon={<SpeedIcon fontSize="small" />} label="Rafală" value={sample ? numberLabel(sample.windGusts, "km/h") : "n/d"} />
-            <Fact label="Spread" value={sample ? numberLabel(gustSpreadOf(sample), "km/h") : "n/d"} />
+            <Fact icon={<AirIcon fontSize="small" />} label={t.decision.wind} value={sample ? numberLabel(sample.windSpeed, "km/h", 0, locale) : unavailable} />
+            <Fact icon={<SpeedIcon fontSize="small" />} label={t.decision.gust} value={sample ? numberLabel(sample.windGusts, "km/h", 0, locale) : unavailable} />
+            <Fact label={t.console.spread} value={sample ? numberLabel(gustSpreadOf(sample), "km/h", 0, locale) : unavailable} />
           </Stack>
         </Stack>
       </Box>
@@ -862,6 +982,8 @@ function VerdictPanel({
 }
 
 function DetailRow({ sample, timezone }: { sample: WeatherSample; timezone: string }) {
+  const { locale, t } = useLocaleText();
+
   return (
     <Box sx={(theme) => ({ ...panelSx(theme), p: { xs: 2, md: 2.5 } })}>
       <Box
@@ -879,7 +1001,7 @@ function DetailRow({ sample, timezone }: { sample: WeatherSample; timezone: stri
               {sample.weatherLabel}
             </Typography>
             <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.4 }}>
-              Actualizat la {formatTime(sample.time, timezone)}
+              {t.atmosphere.updatedAt(formatTime(sample.time, timezone, locale))}
             </Typography>
           </Box>
           <Box
@@ -889,11 +1011,11 @@ function DetailRow({ sample, timezone }: { sample: WeatherSample; timezone: stri
               gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(3, minmax(0, 1fr))" },
             }}
           >
-            <Fact label="Direcție" value={windDirectionLabel(sample.windDirection)} />
-            <Fact label="Temperatură" value={numberLabel(sample.temperature, "C", 1)} />
-            <Fact label="Vizibilitate" value={distanceLabel(sample.visibility)} />
-            <Fact label="Ploaie" value={percentLabel(sample.precipitationProbability)} />
-            <Fact label="CAPE" value={numberLabel(sample.cape, "J/kg")} />
+            <Fact label={t.atmosphere.direction} value={windDirectionLabel(sample.windDirection, locale)} />
+            <Fact label={t.atmosphere.temperature} value={numberLabel(sample.temperature, "C", 1, locale)} />
+            <Fact label={t.metrics.visibility} value={distanceLabel(sample.visibility, locale)} />
+            <Fact label={t.console.rain} value={percentLabel(sample.precipitationProbability, locale)} />
+            <Fact label={t.console.cape} value={numberLabel(sample.cape, "J/kg", 0, locale)} />
           </Box>
         </Stack>
       </Box>
@@ -903,20 +1025,21 @@ function DetailRow({ sample, timezone }: { sample: WeatherSample; timezone: stri
 
 function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
   const theme = useTheme();
+  const { locale, t } = useLocaleText();
 
   return (
     <Stack spacing={1.25}>
       <Box>
         <Typography component="h3" variant="h3">
-          Ferestre de lansare
+          {t.console.windowsTitle}
         </Typography>
         <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.4 }}>
-          Orele de lumină sortate după scor
+          {t.console.windowsSubtitle}
         </Typography>
       </Box>
       {forecast.topWindows.length === 0 ? (
         <Alert severity="warning" sx={alertSx("warning")}>
-          Nicio oră cu lumină nu trece de filtrele pentru vânt, vreme și vizibilitate.
+          {t.scanner.empty}
         </Alert>
       ) : (
         <Stack spacing={1}>
@@ -935,7 +1058,7 @@ function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
                 })}
               >
                 <Typography sx={{ fontWeight: 700 }}>
-                  {formatTime(sample.time, forecast.timezone)}
+                  {formatTime(sample.time, forecast.timezone, locale)}
                 </Typography>
                 <Box>
                   <Typography variant="body2" sx={{ color: tone.color, fontWeight: 700 }}>
@@ -960,10 +1083,13 @@ function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
                   </Box>
                 </Box>
                 <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                  Vânt {numberLabel(sample.windSpeed, "km/h")} / rafală {numberLabel(sample.windGusts, "km/h")}
+                  {t.scanner.windGust(
+                    numberLabel(sample.windSpeed, "km/h", 0, locale),
+                    numberLabel(sample.windGusts, "km/h", 0, locale),
+                  )}
                 </Typography>
                 <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                  {sample.weatherLabel}, ploaie {percentLabel(sample.precipitationProbability)}
+                  {sample.weatherLabel}, {t.scanner.rain(percentLabel(sample.precipitationProbability, locale))}
                 </Typography>
               </Box>
             );
@@ -975,19 +1101,20 @@ function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
 }
 
 function ExtraMetrics({ sample }: { sample: WeatherSample }) {
+  const { locale, t } = useLocaleText();
   const items = [
-    { label: "Presiune", value: numberLabel(sample.pressure, "hPa") },
-    { label: "Umiditate", value: percentLabel(sample.humidity) },
-    { label: "Nori", value: percentLabel(sample.cloudCover) },
-    { label: "UV", value: numberLabel(sample.uvIndex, "", 1) },
-    { label: "AQI", value: sample.usAqi === null ? "n/d" : String(Math.round(sample.usAqi)) },
-    { label: "PM2.5", value: numberLabel(sample.pm25, "ug/m3", 1) },
+    { label: t.metrics.pressure, value: numberLabel(sample.pressure, "hPa", 0, locale) },
+    { label: t.console.humidity, value: percentLabel(sample.humidity, locale) },
+    { label: t.metrics.clouds, value: percentLabel(sample.cloudCover, locale) },
+    { label: t.console.uv, value: numberLabel(sample.uvIndex, "", 1, locale) },
+    { label: t.console.aqi, value: sample.usAqi === null ? t.common.notAvailable : String(Math.round(sample.usAqi)) },
+    { label: t.console.pm25, value: numberLabel(sample.pm25, "ug/m3", 1, locale) },
   ];
 
   return (
     <Accordion disableGutters elevation={0} sx={accordionSx}>
       <AccordionSummary expandIcon={<ExpandMoreIcon />} id="more-metrics-header" aria-controls="more-metrics">
-        <Typography sx={{ fontWeight: 700 }}>Mai multe date</Typography>
+        <Typography sx={{ fontWeight: 700 }}>{t.console.moreData}</Typography>
       </AccordionSummary>
       <AccordionDetails id="more-metrics">
         <Box
@@ -1008,12 +1135,13 @@ function ExtraMetrics({ sample }: { sample: WeatherSample }) {
 
 function ScoreOrb({ score, status }: { score: number; status: FlightStatus }) {
   const theme = useTheme();
+  const { t } = useLocaleText();
   const tone = statusTone(status, theme.palette.mode);
   const angle = Math.max(0, Math.min(360, Math.round(score * 3.6)));
 
   return (
     <Box
-      aria-label={`Scor ${PRODUCT_NAME} ${score} din 100`}
+      aria-label={t.common.scoreOutOf100(score)}
       role="img"
       sx={{
         width: 148,
@@ -1038,7 +1166,7 @@ function ScoreOrb({ score, status }: { score: number; status: FlightStatus }) {
           {score}
         </Typography>
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          /100
+          {t.common.scoreDenominator}
         </Typography>
       </Stack>
     </Box>
@@ -1047,7 +1175,14 @@ function ScoreOrb({ score, status }: { score: number; status: FlightStatus }) {
 
 function WindDial({ sample }: { sample: WeatherSample }) {
   const theme = useTheme();
+  const { locale, t } = useLocaleText();
   const rotation = sample.windDirection ?? 0;
+  const compassPoints = [
+    { key: "n", label: t.directions.n },
+    { key: "e", label: t.directions.e },
+    { key: "s", label: t.directions.s },
+    { key: "w", label: t.directions.w },
+  ] as const;
   const status: FlightStatus =
     sample.windSpeed !== null && sample.windSpeed >= 8 && sample.windSpeed <= 22
       ? "good"
@@ -1058,7 +1193,7 @@ function WindDial({ sample }: { sample: WeatherSample }) {
 
   return (
     <Box
-      aria-label={`Vânt ${windDirectionLabel(sample.windDirection)} ${numberLabel(sample.windSpeed, "km/h")}`}
+      aria-label={`${t.decision.wind} ${windDirectionLabel(sample.windDirection, locale)} ${numberLabel(sample.windSpeed, "km/h", 0, locale)}`}
       role="img"
       sx={{
         width: 160,
@@ -1072,22 +1207,22 @@ function WindDial({ sample }: { sample: WeatherSample }) {
         mx: { xs: "auto", sm: 0 },
       }}
     >
-      {["N", "E", "S", "V"].map((point) => (
+      {compassPoints.map((point) => (
         <Typography
-          key={point}
+          key={point.key}
           variant="body2"
           sx={{
             color: "text.secondary",
             fontWeight: 700,
             position: "absolute",
-            top: point === "N" ? 8 : point === "S" ? "auto" : "50%",
-            bottom: point === "S" ? 8 : "auto",
-            left: point === "V" ? 10 : point === "E" ? "auto" : "50%",
-            right: point === "E" ? 10 : "auto",
-            transform: point === "N" || point === "S" ? "translateX(-50%)" : "translateY(-50%)",
+            top: point.key === "n" ? 8 : point.key === "s" ? "auto" : "50%",
+            bottom: point.key === "s" ? 8 : "auto",
+            left: point.key === "w" ? 10 : point.key === "e" ? "auto" : "50%",
+            right: point.key === "e" ? 10 : "auto",
+            transform: point.key === "n" || point.key === "s" ? "translateX(-50%)" : "translateY(-50%)",
           }}
         >
-          {point}
+          {point.label}
         </Typography>
       ))}
       <Box
@@ -1113,10 +1248,10 @@ function WindDial({ sample }: { sample: WeatherSample }) {
       />
       <Stack spacing={0.15} sx={{ position: "absolute", alignItems: "center" }}>
         <Typography sx={{ color: tone.color, fontWeight: 700, fontSize: "1.25rem" }}>
-          {windDirectionLabel(sample.windDirection)}
+          {windDirectionLabel(sample.windDirection, locale)}
         </Typography>
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          {numberLabel(sample.windSpeed, "km/h")}
+          {numberLabel(sample.windSpeed, "km/h", 0, locale)}
         </Typography>
       </Stack>
     </Box>
@@ -1187,6 +1322,71 @@ function accordionSx(theme: Theme) {
     "&:before": { display: "none" },
     "&.Mui-expanded": { margin: 0 },
   };
+}
+
+function LanguagePicker({
+  locale,
+  setLocale,
+  t,
+}: {
+  locale: AppLocale;
+  setLocale: (value: AppLocale) => void;
+  t: LocaleText;
+}) {
+  const value = getLocaleOption(locale);
+
+  return (
+    <Tooltip title={t.language.tooltip}>
+      <Autocomplete
+        clearText={t.language.clear}
+        closeText={t.language.close}
+        disableClearable
+        getOptionKey={(option) => option.code}
+        getOptionLabel={getLocaleOptionLabel}
+        inputValue={getLocaleButtonLabel(locale)}
+        isOptionEqualToValue={(option, nextValue) => option.code === nextValue.code}
+        noOptionsText={t.language.noOptions}
+        onChange={(_, nextValue) => setLocale(nextValue.code)}
+        onInputChange={() => undefined}
+        openText={t.language.open}
+        options={EUROPEAN_LOCALE_OPTIONS}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            aria-label={t.language.label}
+            size="small"
+            slotProps={{
+              input: {
+                ...params.slotProps.input,
+                startAdornment: (
+                  <>
+                    <LanguageIcon sx={{ color: "primary.main", fontSize: 18, mr: 0.5 }} />
+                    {params.slotProps.input.startAdornment}
+                  </>
+                ),
+              },
+            }}
+          />
+        )}
+        renderOption={(props, option) => (
+          <Box component="li" {...props} key={option.code}>
+            <Stack spacing={0.15} sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 700 }}>{getLocaleOptionLabel(option)}</Typography>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                {option.countryName} · {option.languageName}
+              </Typography>
+            </Stack>
+          </Box>
+        )}
+        size="small"
+        sx={{
+          width: { xs: 118, sm: 168 },
+          "& .MuiAutocomplete-input": { minWidth: "0 !important", fontWeight: 650 },
+        }}
+        value={value}
+      />
+    </Tooltip>
+  );
 }
 
 function alertSx(kind: "error" | "warning") {

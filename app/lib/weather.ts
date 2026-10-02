@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { VERDICT_TITLES } from "../brand";
+import {
+  DEFAULT_LOCALE,
+  getIntlLocale,
+  getOpenMeteoLanguage,
+  getTranslations,
+  type AppLocale,
+} from "../i18n";
 
 export type LocationChoice = {
   id: string;
@@ -180,11 +186,15 @@ const GeocodingSchema = z.object({
     .optional(),
 });
 
-async function requestJson<T>(url: string, schema: z.ZodSchema<T>): Promise<T> {
+async function requestJson<T>(
+  url: string,
+  schema: z.ZodSchema<T>,
+  locale: AppLocale = DEFAULT_LOCALE,
+): Promise<T> {
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(`Serviciul meteo a răspuns cu status ${response.status}`);
+    throw new Error(getTranslations(locale).errors.weatherServiceStatus(response.status));
   }
 
   return schema.parse(await response.json());
@@ -214,7 +224,10 @@ function airUrl(location: LocationChoice, params: Record<string, string>) {
   return `https://air-quality-api.open-meteo.com/v1/air-quality?${search.toString()}`;
 }
 
-export async function searchLocations(query: string): Promise<LocationChoice[]> {
+export async function searchLocations(
+  query: string,
+  locale: AppLocale = DEFAULT_LOCALE,
+): Promise<LocationChoice[]> {
   const trimmed = query.trim();
 
   if (trimmed.length < 3) {
@@ -224,12 +237,13 @@ export async function searchLocations(query: string): Promise<LocationChoice[]> 
   const search = new URLSearchParams({
     name: trimmed,
     count: "6",
-    language: "ro",
+    language: getOpenMeteoLanguage(locale),
     format: "json",
   });
   const data = await requestJson(
     `https://geocoding-api.open-meteo.com/v1/search?${search.toString()}`,
     GeocodingSchema,
+    locale,
   );
 
   return (data.results ?? []).map((place) => ({
@@ -245,6 +259,7 @@ export async function searchLocations(query: string): Promise<LocationChoice[]> 
 
 export async function fetchCurrentSnapshot(
   location: LocationChoice,
+  locale: AppLocale = DEFAULT_LOCALE,
 ): Promise<CurrentSnapshot> {
   const [forecast, air] = await Promise.all([
     requestJson(
@@ -269,12 +284,14 @@ export async function fetchCurrentSnapshot(
         ].join(","),
       }),
       CurrentForecastSchema,
+      locale,
     ),
     requestJson(
       airUrl(location, {
         current: "european_aqi,us_aqi,pm10,pm2_5,uv_index",
       }),
       CurrentAirSchema,
+      locale,
     ),
   ]);
 
@@ -291,7 +308,7 @@ export async function fetchCurrentSnapshot(
       (forecast.current.snowfall ?? 0),
     precipitationProbability: null,
     weatherCode: forecast.current.weather_code,
-    weatherLabel: weatherCodeLabel(forecast.current.weather_code),
+    weatherLabel: weatherCodeLabel(forecast.current.weather_code, locale),
     cloudCover: forecast.current.cloud_cover,
     visibility: forecast.current.visibility,
     windSpeed: forecast.current.wind_speed_10m,
@@ -312,7 +329,7 @@ export async function fetchCurrentSnapshot(
     timezone: forecast.timezone,
     elevation: forecast.elevation ?? null,
     sample,
-    verdict: evaluateFlight(sample),
+    verdict: evaluateFlight(sample, locale),
     sources: [
       "Open-Meteo Forecast",
       "Open-Meteo Air Quality",
@@ -324,6 +341,7 @@ export async function fetchCurrentSnapshot(
 export async function fetchDayForecast(
   location: LocationChoice,
   date: string,
+  locale: AppLocale = DEFAULT_LOCALE,
 ): Promise<DayForecast> {
   const [forecast, air] = await Promise.all([
     requestJson(
@@ -360,6 +378,7 @@ export async function fetchDayForecast(
         ].join(","),
       }),
       ForecastDaySchema,
+      locale,
     ),
     requestJson(
       airUrl(location, {
@@ -368,6 +387,7 @@ export async function fetchDayForecast(
         hourly: "european_aqi,us_aqi,pm10,pm2_5,uv_index",
       }),
       AirDaySchema,
+      locale,
     ),
   ]);
 
@@ -388,7 +408,7 @@ export async function fetchDayForecast(
       precipitationProbability:
         forecast.hourly.precipitation_probability[index] ?? null,
       weatherCode: forecast.hourly.weather_code[index] ?? null,
-      weatherLabel: weatherCodeLabel(forecast.hourly.weather_code[index]),
+      weatherLabel: weatherCodeLabel(forecast.hourly.weather_code[index], locale),
       cloudCover: forecast.hourly.cloud_cover[index] ?? null,
       visibility: forecast.hourly.visibility[index] ?? null,
       windSpeed: forecast.hourly.wind_speed_10m[index] ?? null,
@@ -414,15 +434,15 @@ export async function fetchDayForecast(
 
   const ranked = samples
     .filter((sample) => sample.isDay !== false)
-    .map((sample) => ({ sample, verdict: evaluateFlight(sample) }))
+    .map((sample) => ({ sample, verdict: evaluateFlight(sample, locale) }))
     .sort((a, b) => b.verdict.score - a.verdict.score);
   const best = ranked[0] ?? {
     sample: null,
     verdict: {
       status: "no-go" as const,
-      title: VERDICT_TITLES.noDaylight,
+      title: getTranslations(locale).weather.titles.noLight,
       score: 0,
-      reasons: ["Prognoza nu a returnat ore cu lumină naturală pentru data selectată."],
+      reasons: [getTranslations(locale).weather.reasons.noLightForecast],
       cautions: [],
     },
   };
@@ -433,7 +453,7 @@ export async function fetchDayForecast(
     timezone: forecast.timezone,
     daily: {
       weatherCode: forecast.daily.weather_code[0] ?? null,
-      weatherLabel: weatherCodeLabel(forecast.daily.weather_code[0]),
+      weatherLabel: weatherCodeLabel(forecast.daily.weather_code[0], locale),
       temperatureMax: forecast.daily.temperature_2m_max[0] ?? null,
       temperatureMin: forecast.daily.temperature_2m_min[0] ?? null,
       precipitationSum: forecast.daily.precipitation_sum[0] ?? null,
@@ -454,7 +474,11 @@ export async function fetchDayForecast(
   };
 }
 
-export function evaluateFlight(sample: WeatherSample): FlightVerdict {
+export function evaluateFlight(
+  sample: WeatherSample,
+  locale: AppLocale = DEFAULT_LOCALE,
+): FlightVerdict {
+  const t = getTranslations(locale).weather;
   let score = 100;
   const hard: string[] = [];
   const cautions: string[] = [];
@@ -472,46 +496,46 @@ export function evaluateFlight(sample: WeatherSample): FlightVerdict {
     score -= penalty;
   };
 
-  if (sample.isDay === false) noGo("Nu este lumină naturală la zona de zbor.", 45);
-  if (sample.windSpeed === null) noGo("Viteza vântului nu este disponibilă.", 35);
-  else if (sample.windSpeed < 4) noGo("Vântul este prea slab pentru o lansare previzibilă la picior.", 30);
-  else if (sample.windSpeed < 8) caution("Vântul este slab și poate deveni variabil.", 12);
-  else if (sample.windSpeed > 28) noGo("Vântul susținut depășește o limită conservatoare pentru parapantă.", 40);
-  else if (sample.windSpeed > 22) caution("Vântul susținut este aproape de limita superioară de confort.", 18);
+  if (sample.isDay === false) noGo(t.reasons.noLightAtArea, 45);
+  if (sample.windSpeed === null) noGo(t.reasons.windUnavailable, 35);
+  else if (sample.windSpeed < 4) noGo(t.reasons.windTooWeak, 30);
+  else if (sample.windSpeed < 8) caution(t.reasons.windWeakVariable, 12);
+  else if (sample.windSpeed > 28) noGo(t.reasons.windTooStrong, 40);
+  else if (sample.windSpeed > 22) caution(t.reasons.windNearComfortLimit, 18);
 
-  if (sample.windGusts === null) caution("Datele despre rafale nu sunt disponibile.", 10);
-  else if (sample.windGusts > 35) noGo("Rafalele sunt prea puternice pentru o decizie conservatoare de lansare.", 38);
-  else if (sample.windGusts > 28) caution("Rafalele sunt ridicate.", 16);
+  if (sample.windGusts === null) caution(t.reasons.gustUnavailable, 10);
+  else if (sample.windGusts > 35) noGo(t.reasons.gustTooStrong, 38);
+  else if (sample.windGusts > 28) caution(t.reasons.gustElevated, 16);
 
-  if (gustSpread !== null && gustSpread > 16) noGo("Diferența dintre vânt și rafale este mare, semn de aer turbulent sau instabil.", 32);
-  else if (gustSpread !== null && gustSpread > 10) caution("Diferența dintre vânt și rafale merită atenție.", 14);
+  if (gustSpread !== null && gustSpread > 16) noGo(t.reasons.spreadLarge, 32);
+  else if (gustSpread !== null && gustSpread > 10) caution(t.reasons.spreadAttention, 14);
 
-  if (sample.precipitation !== null && sample.precipitation >= 0.2) noGo("Sunt precipitații active.", 35);
-  if (sample.precipitationProbability !== null && sample.precipitationProbability >= 45) noGo("Probabilitatea de precipitații este ridicată.", 25);
-  else if (sample.precipitationProbability !== null && sample.precipitationProbability >= 25) caution("Riscul de ploaie este relevant.", 12);
+  if (sample.precipitation !== null && sample.precipitation >= 0.2) noGo(t.reasons.activePrecipitation, 35);
+  if (sample.precipitationProbability !== null && sample.precipitationProbability >= 45) noGo(t.reasons.precipitationLikely, 25);
+  else if (sample.precipitationProbability !== null && sample.precipitationProbability >= 25) caution(t.reasons.rainRiskRelevant, 12);
 
   if (sample.weatherCode !== null) {
-    if (sample.weatherCode >= 95) noGo("Există risc de furtună.", 45);
-    else if (sample.weatherCode >= 71 || sample.weatherCode === 65) noGo("Prognoza include precipitații puternice sau ninsoare.", 30);
-    else if ([45, 48, 51, 53, 55, 56, 57, 61, 63, 66, 67, 80, 81, 82].includes(sample.weatherCode)) caution(`${sample.weatherLabel} poate reduce siguranța lansării.`, 12);
+    if (sample.weatherCode >= 95) noGo(t.reasons.thunderstormRisk, 45);
+    else if (sample.weatherCode >= 71 || sample.weatherCode === 65) noGo(t.reasons.heavyPrecipitation, 30);
+    else if ([45, 48, 51, 53, 55, 56, 57, 61, 63, 66, 67, 80, 81, 82].includes(sample.weatherCode)) caution(t.reasons.weatherMayReduce(sample.weatherLabel), 12);
   }
 
-  if (sample.visibility !== null && sample.visibility < 5000) noGo("Vizibilitatea este sub 5 km.", 30);
-  else if (sample.visibility !== null && sample.visibility < 10000) caution("Vizibilitatea este sub 10 km.", 10);
+  if (sample.visibility !== null && sample.visibility < 5000) noGo(t.reasons.visibilityUnder5, 30);
+  else if (sample.visibility !== null && sample.visibility < 10000) caution(t.reasons.visibilityUnder10, 10);
 
-  if (sample.cape !== null && sample.cape > 1500) noGo("CAPE este ridicat, cu risc de instabilitate convectivă.", 35);
-  else if (sample.cape !== null && sample.cape > 800) caution("CAPE sugerează dezvoltare convectivă posibilă.", 14);
+  if (sample.cape !== null && sample.cape > 1500) noGo(t.reasons.capeHigh, 35);
+  else if (sample.cape !== null && sample.cape > 800) caution(t.reasons.capePossible, 14);
 
-  if (sample.cloudCover !== null && sample.cloudCover > 90) caution("Acoperirea noroasă este foarte mare.", 8);
-  if (sample.usAqi !== null && sample.usAqi > 200) noGo("Calitatea aerului este foarte slabă.", 25);
-  else if (sample.usAqi !== null && sample.usAqi > 150) caution("Calitatea aerului este nesănătoasă pentru efort prelungit.", 10);
-  if (sample.uvIndex !== null && sample.uvIndex >= 8) caution("Expunerea UV este ridicată.", 6);
+  if (sample.cloudCover !== null && sample.cloudCover > 90) caution(t.reasons.cloudCoverHigh, 8);
+  if (sample.usAqi !== null && sample.usAqi > 200) noGo(t.reasons.airQualityVeryPoor, 25);
+  else if (sample.usAqi !== null && sample.usAqi > 150) caution(t.reasons.airQualityUnhealthy, 10);
+  if (sample.uvIndex !== null && sample.uvIndex >= 8) caution(t.reasons.uvHigh, 6);
 
   const safeScore = Math.max(0, Math.min(100, Math.round(score)));
   if (hard.length > 0) {
     return {
       status: "no-go",
-      title: VERDICT_TITLES.noGo,
+      title: t.titles.noGo,
       score: Math.min(safeScore, 44),
       reasons: hard,
       cautions,
@@ -521,7 +545,7 @@ export function evaluateFlight(sample: WeatherSample): FlightVerdict {
   if (cautions.length > 0 || safeScore < 78) {
     return {
       status: "marginal",
-      title: VERDICT_TITLES.marginal,
+      title: t.titles.marginal,
       score: Math.min(safeScore, 74),
       reasons: cautions.slice(0, 3),
       cautions: cautions.slice(3),
@@ -530,9 +554,9 @@ export function evaluateFlight(sample: WeatherSample): FlightVerdict {
 
   return {
     status: "good",
-    title: VERDICT_TITLES.good,
+    title: t.titles.good,
     score: safeScore,
-    reasons: ["Vântul, rafalele, precipitațiile, vizibilitatea și instabilitatea arată acceptabil."],
+    reasons: [t.reasons.good],
     cautions,
   };
 }
@@ -543,29 +567,36 @@ export function dateForOffset(offset: number) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-export function formatDateLabel(date: string) {
-  return new Intl.DateTimeFormat("ro-RO", {
+export function formatDateLabel(
+  date: string,
+  locale: AppLocale = DEFAULT_LOCALE,
+) {
+  return new Intl.DateTimeFormat(getIntlLocale(locale), {
     weekday: "short",
     month: "short",
     day: "numeric",
   }).format(new Date(`${date}T12:00:00`));
 }
 
-export function formatTime(value: string | null, timezone?: string) {
-  if (!value) return "n/d";
+export function formatTime(
+  value: string | null,
+  timezone?: string,
+  locale: AppLocale = DEFAULT_LOCALE,
+) {
+  if (!value) return getTranslations(locale).common.notAvailable;
   const isOffsetTimestamp = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value);
   const localTime = value.match(/T(\d{2}):(\d{2})/);
 
   if (localTime && !isOffsetTimestamp) {
     const [, hour, minute] = localTime;
-    return new Intl.DateTimeFormat("ro-RO", {
+    return new Intl.DateTimeFormat(getIntlLocale(locale), {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
     }).format(new Date(2000, 0, 1, Number(hour), Number(minute)));
   }
 
-  return new Intl.DateTimeFormat("ro-RO", {
+  return new Intl.DateTimeFormat(getIntlLocale(locale), {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
@@ -573,16 +604,36 @@ export function formatTime(value: string | null, timezone?: string) {
   }).format(new Date(value));
 }
 
-export function windDirectionLabel(degrees: number | null) {
-  if (degrees === null) return "n/d";
-  return ["N", "NE", "E", "SE", "S", "SV", "V", "NV"][
+export function windDirectionLabel(
+  degrees: number | null,
+  locale: AppLocale = DEFAULT_LOCALE,
+) {
+  const t = getTranslations(locale);
+  if (degrees === null) return t.common.notAvailable;
+  return [
+    t.directions.n,
+    t.directions.ne,
+    t.directions.e,
+    t.directions.se,
+    t.directions.s,
+    t.directions.sw,
+    t.directions.w,
+    t.directions.nw,
+  ][
     Math.round(degrees / 45) % 8
   ];
 }
 
-export function numberLabel(value: number | null, unit: string, digits = 0) {
-  if (value === null || Number.isNaN(value)) return "n/d";
-  const label = new Intl.NumberFormat("ro-RO", {
+export function numberLabel(
+  value: number | null,
+  unit: string,
+  digits = 0,
+  locale: AppLocale = DEFAULT_LOCALE,
+) {
+  if (value === null || Number.isNaN(value)) {
+    return getTranslations(locale).common.notAvailable;
+  }
+  const label = new Intl.NumberFormat(getIntlLocale(locale), {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(value);
@@ -591,8 +642,11 @@ export function numberLabel(value: number | null, unit: string, digits = 0) {
   return `${label}${normalizedUnit ? ` ${normalizedUnit}` : ""}`;
 }
 
-export function percentLabel(value: number | null) {
-  return value === null ? "n/d" : `${Math.round(value)}%`;
+export function percentLabel(
+  value: number | null,
+  locale: AppLocale = DEFAULT_LOCALE,
+) {
+  return value === null ? getTranslations(locale).common.notAvailable : `${Math.round(value)}%`;
 }
 
 export function statusColor(status: FlightStatus) {
@@ -601,53 +655,57 @@ export function statusColor(status: FlightStatus) {
   return "#ff5c7a";
 }
 
-export function weatherCodeLabel(code: number | null | undefined) {
+export function weatherCodeLabel(
+  code: number | null | undefined,
+  locale: AppLocale = DEFAULT_LOCALE,
+) {
+  const t = getTranslations(locale).weather.codes;
   switch (code) {
     case 0:
-      return "Cer senin";
+      return t.clearSky;
     case 1:
-      return "Predominant senin";
+      return t.mainlyClear;
     case 2:
-      return "Parțial noros";
+      return t.partlyCloudy;
     case 3:
-      return "Înnorat";
+      return t.overcast;
     case 45:
     case 48:
-      return "Ceață";
+      return t.fog;
     case 51:
     case 53:
     case 55:
-      return "Burniță";
+      return t.drizzle;
     case 56:
     case 57:
-      return "Burniță înghețată";
+      return t.freezingDrizzle;
     case 61:
     case 63:
-      return "Ploaie";
+      return t.rain;
     case 65:
-      return "Ploaie puternică";
+      return t.heavyRain;
     case 66:
     case 67:
-      return "Ploaie înghețată";
+      return t.freezingRain;
     case 71:
     case 73:
     case 75:
-      return "Ninsoare";
+      return t.snow;
     case 77:
-      return "Grăunțe de zăpadă";
+      return t.snowGrains;
     case 80:
     case 81:
     case 82:
-      return "Averse";
+      return t.showers;
     case 85:
     case 86:
-      return "Averse de zăpadă";
+      return t.snowShowers;
     case 95:
-      return "Furtună";
+      return t.thunderstorm;
     case 96:
     case 99:
-      return "Furtună cu grindină";
+      return t.thunderstormHail;
     default:
-      return "Cod meteo indisponibil";
+      return t.unavailable;
   }
 }
