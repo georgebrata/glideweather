@@ -6,6 +6,7 @@ import DataUsageIcon from "@mui/icons-material/DataUsage";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import DeviceThermostatIcon from "@mui/icons-material/DeviceThermostat";
 import KeyboardCommandKeyIcon from "@mui/icons-material/KeyboardCommandKey";
+import LanguageIcon from "@mui/icons-material/Language";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import LocationSearchingIcon from "@mui/icons-material/LocationSearching";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
@@ -47,7 +48,18 @@ import {
 } from "@mui/material";
 import { alpha, createTheme, type Theme, useTheme } from "@mui/material/styles";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { type ReactNode, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  DEFAULT_LOCALE,
+  EUROPEAN_LOCALE_OPTIONS,
+  getLocaleButtonLabel,
+  getLocaleOption,
+  getLocaleOptionLabel,
+  getTranslations,
+  isAppLocale,
+  type AppLocale,
+  type LocaleText,
+} from "../i18n";
 import {
   CurrentSnapshot,
   DayForecast,
@@ -69,8 +81,11 @@ import {
 type ThemeMode = "dark" | "light";
 
 const THEME_STORAGE_KEY = "parapantabil-theme";
+const LOCALE_STORAGE_KEY = "parapantabil-locale";
 const themeModeListeners = new Set<() => void>();
+const localeListeners = new Set<() => void>();
 let memoryThemeMode: ThemeMode | null = null;
+let memoryLocale: AppLocale | null = null;
 
 function createAppTheme(mode: ThemeMode) {
   const isLight = mode === "light";
@@ -176,7 +191,6 @@ type StatusTone = {
   dim: string;
   glow: string;
   gradient: string;
-  label: string;
 };
 
 const toneByMode: Record<ThemeMode, Record<FlightStatus, StatusTone>> = {
@@ -186,21 +200,18 @@ const toneByMode: Record<ThemeMode, Record<FlightStatus, StatusTone>> = {
       dim: "rgba(77, 255, 165, 0.14)",
       glow: "rgba(77, 255, 165, 0.36)",
       gradient: "linear-gradient(135deg, rgba(77,255,165,0.24), rgba(97,244,222,0.08))",
-      label: "fereastră bună",
     },
     marginal: {
       color: "#ffd166",
       dim: "rgba(255, 209, 102, 0.15)",
       glow: "rgba(255, 209, 102, 0.32)",
       gradient: "linear-gradient(135deg, rgba(255,209,102,0.23), rgba(255,121,94,0.08))",
-      label: "la limită",
     },
     "no-go": {
       color: "#ff5c7a",
       dim: "rgba(255, 92, 122, 0.15)",
       glow: "rgba(255, 92, 122, 0.34)",
       gradient: "linear-gradient(135deg, rgba(255,92,122,0.24), rgba(255,209,102,0.06))",
-      label: "nu lansa",
     },
   },
   light: {
@@ -209,21 +220,18 @@ const toneByMode: Record<ThemeMode, Record<FlightStatus, StatusTone>> = {
       dim: "rgba(4, 120, 87, 0.13)",
       glow: "rgba(4, 120, 87, 0.22)",
       gradient: "linear-gradient(135deg, rgba(34,197,143,0.22), rgba(8,127,130,0.1))",
-      label: "fereastră bună",
     },
     marginal: {
       color: "#a16207",
       dim: "rgba(161, 98, 7, 0.14)",
       glow: "rgba(217, 119, 6, 0.22)",
       gradient: "linear-gradient(135deg, rgba(245,158,11,0.22), rgba(251,146,60,0.1))",
-      label: "la limită",
     },
     "no-go": {
       color: "#be123c",
       dim: "rgba(190, 18, 60, 0.13)",
       glow: "rgba(190, 18, 60, 0.2)",
       gradient: "linear-gradient(135deg, rgba(244,63,94,0.18), rgba(245,158,11,0.08))",
-      label: "nu lansa",
     },
   },
 };
@@ -386,6 +394,53 @@ function writeThemeMode(mode: ThemeMode) {
   themeModeListeners.forEach((listener) => listener());
 }
 
+function readInitialLocale(): AppLocale {
+  if (memoryLocale) return memoryLocale;
+  if (typeof window === "undefined") return DEFAULT_LOCALE;
+
+  try {
+    const storedLocale = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+    if (isAppLocale(storedLocale)) return storedLocale;
+
+    const browserLocale = window.navigator.languages.find(isAppLocale);
+    return browserLocale ?? DEFAULT_LOCALE;
+  } catch {
+    return DEFAULT_LOCALE;
+  }
+}
+
+function subscribeLocale(listener: () => void) {
+  if (typeof window === "undefined") return () => undefined;
+
+  localeListeners.add(listener);
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === LOCALE_STORAGE_KEY) listener();
+  };
+
+  window.addEventListener("storage", handleStorage);
+
+  return () => {
+    localeListeners.delete(listener);
+    window.removeEventListener("storage", handleStorage);
+  };
+}
+
+function getServerLocale(): AppLocale {
+  return DEFAULT_LOCALE;
+}
+
+function writeLocale(locale: AppLocale) {
+  memoryLocale = locale;
+
+  try {
+    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+  } catch {
+    // Locale persistence is optional; the selected language still applies in memory.
+  }
+
+  localeListeners.forEach((listener) => listener());
+}
+
 export default function ParagliderWeatherApp() {
   const [queryClient] = useState(
     () =>
@@ -400,22 +455,43 @@ export default function ParagliderWeatherApp() {
     readInitialThemeMode,
     getServerThemeMode,
   );
+  const locale = useSyncExternalStore(
+    subscribeLocale,
+    readInitialLocale,
+    getServerLocale,
+  );
   const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
+  const t = useMemo(() => getTranslations(locale), [locale]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = themeMode;
     document.documentElement.style.colorScheme = themeMode;
   }, [themeMode]);
 
+  useEffect(() => {
+    document.documentElement.lang = t.meta.documentLang;
+    document.title = t.meta.title;
+    document
+      .querySelector('meta[name="description"]')
+      ?.setAttribute("content", t.meta.description);
+  }, [t]);
+
   const toggleThemeMode = useCallback(() => {
     writeThemeMode(themeMode === "dark" ? "light" : "dark");
   }, [themeMode]);
+
+  const setLocale = useCallback((nextLocale: AppLocale) => {
+    writeLocale(nextLocale);
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <ParagliderWeatherDashboard
+          locale={locale}
+          setLocale={setLocale}
+          t={t}
           themeMode={themeMode}
           toggleThemeMode={toggleThemeMode}
         />
@@ -425,9 +501,15 @@ export default function ParagliderWeatherApp() {
 }
 
 function ParagliderWeatherDashboard({
+  locale,
+  setLocale,
+  t,
   themeMode,
   toggleThemeMode,
 }: {
+  locale: AppLocale;
+  setLocale: (value: AppLocale) => void;
+  t: LocaleText;
   themeMode: ThemeMode;
   toggleThemeMode: () => void;
 }) {
@@ -436,12 +518,17 @@ function ParagliderWeatherDashboard({
   const [locating, setLocating] = useState(false);
   const [locationNotice, setLocationNotice] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
+  const tRef = useRef(t);
+
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   const requestLocation = useCallback(() => {
+    const text = tRef.current;
+
     if (!navigator.geolocation) {
-      setLocationNotice(
-        "Poziția browserului nu este disponibilă. Caută o zonă de decolare sau o localitate.",
-      );
+      setLocationNotice(text.location.unavailable);
       setLocation(null);
       return;
     }
@@ -452,7 +539,7 @@ function ParagliderWeatherDashboard({
         const { latitude, longitude } = position.coords;
         setLocation({
           id: `gps-${latitude.toFixed(4)}-${longitude.toFixed(4)}`,
-          name: "Poziția curentă",
+          name: text.location.currentPosition,
           detail: `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
           latitude,
           longitude,
@@ -463,9 +550,7 @@ function ParagliderWeatherDashboard({
         setLocating(false);
       },
       () => {
-        setLocationNotice(
-          "Permisiunea de localizare nu este activă. Caută manual o zonă de decolare sau o localitate.",
-        );
+        setLocationNotice(text.location.permissionDenied);
         setLocation(null);
         setActiveTab(0);
         setLocating(false);
@@ -480,15 +565,15 @@ function ParagliderWeatherDashboard({
   }, [requestLocation]);
 
   const currentQuery = useQuery({
-    queryKey: ["current-weather", location?.latitude, location?.longitude],
-    queryFn: () => fetchCurrentSnapshot(location as LocationChoice),
+    queryKey: ["current-weather", location?.latitude, location?.longitude, locale],
+    queryFn: () => fetchCurrentSnapshot(location as LocationChoice, locale),
     enabled: Boolean(location),
     refetchInterval: 1000 * 60 * 12,
   });
 
   const searchQuery = useQuery({
-    queryKey: ["location-search", searchText],
-    queryFn: () => searchLocations(searchText),
+    queryKey: ["location-search", searchText, locale],
+    queryFn: () => searchLocations(searchText, locale),
     enabled: searchText.trim().length >= 3,
     staleTime: 1000 * 60 * 20,
   });
@@ -505,6 +590,7 @@ function ParagliderWeatherDashboard({
           <HeaderPanel
             currentSnapshot={currentQuery.data}
             isFetching={currentQuery.isFetching}
+            locale={locale}
             locating={locating}
             location={location}
             refetchCurrent={() => currentQuery.refetch()}
@@ -513,10 +599,12 @@ function ParagliderWeatherDashboard({
             searchFetching={searchQuery.isFetching}
             searchText={searchText}
             setActiveTab={setActiveTab}
+            setLocale={setLocale}
             setLocation={setLocation}
             setLocationNotice={setLocationNotice}
             setSearchText={setSearchText}
             sourceChips={sourceChips}
+            t={t}
             themeMode={themeMode}
             toggleThemeMode={toggleThemeMode}
           />
@@ -535,9 +623,11 @@ function ParagliderWeatherDashboard({
             <WeatherPanels
               activeTab={activeTab}
               currentQuery={currentQuery}
+              locale={locale}
               locating={locating}
               location={location}
               setActiveTab={setActiveTab}
+              t={t}
             />
           ) : (
             <EmptyLocationPanel
@@ -549,6 +639,7 @@ function ParagliderWeatherDashboard({
                 setLocationNotice(null);
                 setActiveTab(0);
               }}
+              t={t}
             />
           )}
         </Stack>
@@ -560,6 +651,7 @@ function ParagliderWeatherDashboard({
 function HeaderPanel({
   currentSnapshot,
   isFetching,
+  locale,
   locating,
   location,
   refetchCurrent,
@@ -568,15 +660,18 @@ function HeaderPanel({
   searchFetching,
   searchText,
   setActiveTab,
+  setLocale,
   setLocation,
   setLocationNotice,
   setSearchText,
   sourceChips,
+  t,
   themeMode,
   toggleThemeMode,
 }: {
   currentSnapshot?: CurrentSnapshot;
   isFetching: boolean;
+  locale: AppLocale;
   locating: boolean;
   location: LocationChoice | null;
   refetchCurrent: () => void;
@@ -585,15 +680,17 @@ function HeaderPanel({
   searchFetching: boolean;
   searchText: string;
   setActiveTab: (value: number) => void;
+  setLocale: (value: AppLocale) => void;
   setLocation: (value: LocationChoice | null) => void;
   setLocationNotice: (value: string | null) => void;
   setSearchText: (value: string) => void;
   sourceChips: string[];
+  t: LocaleText;
   themeMode: ThemeMode;
   toggleThemeMode: () => void;
 }) {
   const themeToggleLabel =
-    themeMode === "dark" ? "Activează tema luminoasă" : "Activează tema întunecată";
+    themeMode === "dark" ? t.theme.enableLight : t.theme.enableDark;
 
   return (
     <PanelShell sx={{ p: { xs: 1.5, md: 2 }, minHeight: 184 }}>
@@ -614,42 +711,45 @@ function HeaderPanel({
             sx={{ alignItems: "flex-start", justifyContent: "space-between" }}
           >
             <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", minWidth: 0 }}>
-              <Chip icon={<LogoMark size={18} />} size="small" label="Parapantabil OS" />
+              <Chip icon={<LogoMark size={18} />} size="small" label={t.header.productChip} />
               {sourceChips.map((source) => (
-                <Chip key={source} size="small" label={romanianSource(source)} />
+                <Chip key={source} size="small" label={sourceLabel(source, t)} />
               ))}
             </Stack>
-            <Tooltip title={themeToggleLabel}>
-              <IconButton
-                aria-label={themeToggleLabel}
-                onClick={toggleThemeMode}
-                size="small"
-                sx={(theme) => ({
-                  flex: "0 0 auto",
-                  width: 38,
-                  height: 38,
-                  border: `1px solid ${alpha(theme.palette.primary.main, 0.28)}`,
-                  color: "primary.main",
-                  background:
-                    theme.palette.mode === "light"
-                      ? "rgba(255,255,255,0.72)"
-                      : "rgba(97,244,222,0.08)",
-                  boxShadow:
-                    theme.palette.mode === "light"
-                      ? "0 10px 24px rgba(7,52,74,0.12)"
-                      : "0 0 22px rgba(97,244,222,0.12)",
-                  "&:hover": {
-                    background: alpha(theme.palette.primary.main, 0.14),
-                  },
-                })}
-              >
-                {themeMode === "dark" ? (
-                  <LightModeIcon fontSize="small" />
-                ) : (
-                  <DarkModeIcon fontSize="small" />
-                )}
-              </IconButton>
-            </Tooltip>
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center", flex: "0 0 auto" }}>
+              <LanguagePicker locale={locale} setLocale={setLocale} t={t} />
+              <Tooltip title={themeToggleLabel}>
+                <IconButton
+                  aria-label={themeToggleLabel}
+                  onClick={toggleThemeMode}
+                  size="small"
+                  sx={(theme) => ({
+                    flex: "0 0 auto",
+                    width: 38,
+                    height: 38,
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.28)}`,
+                    color: "primary.main",
+                    background:
+                      theme.palette.mode === "light"
+                        ? "rgba(255,255,255,0.72)"
+                        : "rgba(97,244,222,0.08)",
+                    boxShadow:
+                      theme.palette.mode === "light"
+                        ? "0 10px 24px rgba(7,52,74,0.12)"
+                        : "0 0 22px rgba(97,244,222,0.12)",
+                    "&:hover": {
+                      background: alpha(theme.palette.primary.main, 0.14),
+                    },
+                  })}
+                >
+                  {themeMode === "dark" ? (
+                    <LightModeIcon fontSize="small" />
+                  ) : (
+                    <DarkModeIcon fontSize="small" />
+                  )}
+                </IconButton>
+              </Tooltip>
+            </Stack>
           </Stack>
           <Box
             sx={{
@@ -671,14 +771,13 @@ function HeaderPanel({
                   textShadow: "0 0 34px rgba(97,244,222,0.22)",
                 }}
               >
-                Parapantabil?
+                {t.header.headline}
               </Typography>
             </Box>
           </Box>
           <Box>
             <Typography sx={{ mt: 0.8, maxWidth: 760, color: "text.secondary" }}>
-              Consolă meteo pentru piloți parapantă: vânt, rafale, vizibilitate, instabilitate și fereastră
-              de lansare citite ca un singur semnal.
+              {t.header.intro}
             </Typography>
           </Box>
 
@@ -756,8 +855,8 @@ function HeaderPanel({
             spacing={1}
             sx={{ alignItems: { xs: "stretch", sm: "center" } }}
           >
-            <LocationSummary location={location} snapshot={currentSnapshot} />
-            <Tooltip title="Folosește poziția browserului">
+            <LocationSummary location={location} snapshot={currentSnapshot} t={t} />
+            <Tooltip title={t.location.useBrowserPosition}>
               <span>
                 <Button
                   variant="contained"
@@ -777,11 +876,11 @@ function HeaderPanel({
                     },
                   }}
                 >
-                  Poziția mea
+                  {t.location.myPosition}
                 </Button>
               </span>
             </Tooltip>
-            <Tooltip title="Recalibrează datele meteo">
+            <Tooltip title={t.header.refreshTooltip}>
               <span>
                 <Button
                   variant="outlined"
@@ -794,7 +893,7 @@ function HeaderPanel({
                     background: alpha(theme.palette.primary.main, theme.palette.mode === "light" ? 0.07 : 0.05),
                   })}
                 >
-                  Recalibrează
+                  {t.header.refresh}
                 </Button>
               </span>
             </Tooltip>
@@ -825,7 +924,7 @@ function HeaderPanel({
                 fontWeight: 800,
               })}
             >
-              Comandă locație
+              {t.header.locationCommand}
             </Typography>
             <Box
               sx={(theme) => ({
@@ -835,13 +934,13 @@ function HeaderPanel({
               })}
             />
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              minim 3 caractere
+              {t.header.minimumCharacters}
             </Typography>
           </Stack>
           <Autocomplete
             fullWidth
-            clearText="Golește"
-            closeText="Închide"
+            clearText={t.language.clear}
+            closeText={t.language.close}
             filterOptions={(options) => options}
             getOptionLabel={(option) =>
               typeof option === "string"
@@ -850,8 +949,8 @@ function HeaderPanel({
             }
             inputValue={searchText}
             loading={searchFetching}
-            loadingText="Scanez harta..."
-            noOptionsText="Nicio zonă găsită"
+            loadingText={t.header.searchLoading}
+            noOptionsText={t.header.searchEmpty}
             onChange={(_, nextValue) => {
               if (nextValue && typeof nextValue !== "string") {
                 setLocation(nextValue);
@@ -861,13 +960,13 @@ function HeaderPanel({
               }
             }}
             onInputChange={(_, nextValue) => setSearchText(nextValue)}
-            openText="Deschide"
+            openText={t.language.open}
             options={searchData}
             renderInput={(params) => (
               <TextField
                 {...params}
-                label="Caută zonă / localitate"
-                placeholder="Brașov, Bunloc, Clopotiva..."
+                label={t.header.searchLabel}
+                placeholder={t.header.searchPlaceholder}
               />
             )}
           />
@@ -877,18 +976,105 @@ function HeaderPanel({
   );
 }
 
+function LanguagePicker({
+  locale,
+  setLocale,
+  t,
+}: {
+  locale: AppLocale;
+  setLocale: (value: AppLocale) => void;
+  t: LocaleText;
+}) {
+  const value = getLocaleOption(locale);
+
+  return (
+    <Tooltip title={t.language.tooltip}>
+      <Autocomplete
+        clearText={t.language.clear}
+        closeText={t.language.close}
+        disableClearable
+        getOptionLabel={getLocaleOptionLabel}
+        isOptionEqualToValue={(option, nextValue) => option.code === nextValue.code}
+        noOptionsText={t.language.noOptions}
+        onChange={(_, nextValue) => setLocale(nextValue.code)}
+        openText={t.language.open}
+        options={EUROPEAN_LOCALE_OPTIONS}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            aria-label={t.language.label}
+            size="small"
+            slotProps={{
+              input: {
+                ...params.slotProps.input,
+                startAdornment: (
+                  <>
+                    <LanguageIcon sx={{ color: "primary.main", fontSize: 18, mr: 0.75 }} />
+                    {params.slotProps.input.startAdornment}
+                  </>
+                ),
+              },
+            }}
+          />
+        )}
+        renderOption={(props, option) => (
+          <Box component="li" {...props} key={option.code}>
+            <Stack spacing={0.15} sx={{ minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 820 }}>
+                {getLocaleOptionLabel(option)}
+              </Typography>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                {option.countryName} · {option.languageName}
+              </Typography>
+            </Stack>
+          </Box>
+        )}
+        size="small"
+        sx={(theme) => ({
+          width: { xs: 126, sm: 176 },
+          "& .MuiOutlinedInput-root": {
+            minHeight: 38,
+            py: 0,
+            borderRadius: 1,
+            background:
+              theme.palette.mode === "light"
+                ? "rgba(255,255,255,0.72)"
+                : "rgba(97,244,222,0.08)",
+            boxShadow:
+              theme.palette.mode === "light"
+                ? "0 10px 24px rgba(7,52,74,0.12)"
+                : "0 0 22px rgba(97,244,222,0.12)",
+          },
+          "& .MuiAutocomplete-input": {
+            minWidth: "0 !important",
+            fontWeight: 820,
+          },
+        })}
+        value={value}
+        getOptionKey={(option) => option.code}
+        inputValue={getLocaleButtonLabel(locale)}
+        onInputChange={() => undefined}
+      />
+    </Tooltip>
+  );
+}
+
 function WeatherPanels({
   activeTab,
   currentQuery,
+  locale,
   locating,
   location,
   setActiveTab,
+  t,
 }: {
   activeTab: number;
   currentQuery: ReturnType<typeof useQuery<CurrentSnapshot, Error>>;
+  locale: AppLocale;
   locating: boolean;
   location: LocationChoice;
   setActiveTab: (value: number) => void;
+  t: LocaleText;
 }) {
   return (
     <Stack spacing={2.25}>
@@ -910,9 +1096,9 @@ function WeatherPanels({
             },
           }}
         >
-          <Tab label="Acum" value={0} />
+          <Tab label={t.tabs.now} value={0} />
           {[1, 2, 3].map((offset) => (
-            <Tab key={offset} label={formatDateLabel(dateForOffset(offset))} value={offset} />
+            <Tab key={offset} label={formatDateLabel(dateForOffset(offset), locale)} value={offset} />
           ))}
         </Tabs>
       </PanelShell>
@@ -923,11 +1109,20 @@ function WeatherPanels({
           snapshot={currentQuery.data}
           isLoading={currentQuery.isLoading || locating}
           isFetching={currentQuery.isFetching}
+          locale={locale}
+          t={t}
         />
       ) : null}
 
       {[1, 2, 3].map((offset) => (
-        <ForecastPanel key={offset} active={activeTab === offset} location={location} offset={offset} />
+        <ForecastPanel
+          key={offset}
+          active={activeTab === offset}
+          locale={locale}
+          location={location}
+          offset={offset}
+          t={t}
+        />
       ))}
     </Stack>
   );
@@ -937,17 +1132,21 @@ function CurrentPanel({
   snapshot,
   isLoading,
   isFetching,
+  locale,
   queryError,
+  t,
 }: {
   snapshot?: CurrentSnapshot;
   isLoading: boolean;
   isFetching: boolean;
+  locale: AppLocale;
   queryError: Error | null;
+  t: LocaleText;
 }) {
   if (queryError) {
     return (
       <Alert severity="error" sx={alertSx("error")}>
-        Datele meteo live nu au putut fi încărcate: {queryError.message}
+        {t.current.loadError(queryError.message)}
       </Alert>
     );
   }
@@ -982,32 +1181,38 @@ function CurrentPanel({
         }}
       >
         <DecisionDeck
-          eyebrow="scanare live"
+          eyebrow={t.current.eyebrow}
+          locale={locale}
           sample={snapshot.sample}
+          t={t}
           timezone={snapshot.timezone}
-          title="Răspuns curent"
+          title={t.current.title}
           verdict={snapshot.verdict}
         />
-        <AtmospherePanel snapshot={snapshot} />
+        <AtmospherePanel locale={locale} snapshot={snapshot} t={t} />
       </Box>
-      <MetricGrid sample={snapshot.sample} />
+      <MetricGrid locale={locale} sample={snapshot.sample} t={t} />
     </Stack>
   );
 }
 
 function ForecastPanel({
   active,
+  locale,
   location,
   offset,
+  t,
 }: {
   active: boolean;
+  locale: AppLocale;
   location: LocationChoice;
   offset: number;
+  t: LocaleText;
 }) {
   const date = useMemo(() => dateForOffset(offset), [offset]);
   const forecastQuery = useQuery({
-    queryKey: ["day-forecast", location.latitude, location.longitude, date],
-    queryFn: () => fetchDayForecast(location, date),
+    queryKey: ["day-forecast", location.latitude, location.longitude, date, locale],
+    queryFn: () => fetchDayForecast(location, date, locale),
     enabled: active,
   });
 
@@ -1015,16 +1220,24 @@ function ForecastPanel({
   if (forecastQuery.error) {
     return (
       <Alert severity="error" sx={alertSx("error")}>
-        Prognoza nu a putut fi încărcată: {forecastQuery.error.message}
+        {t.forecast.loadError(forecastQuery.error.message)}
       </Alert>
     );
   }
   if (forecastQuery.isLoading || !forecastQuery.data) return <DashboardSkeleton />;
 
-  return <DayForecastView forecast={forecastQuery.data} />;
+  return <DayForecastView forecast={forecastQuery.data} locale={locale} t={t} />;
 }
 
-function DayForecastView({ forecast }: { forecast: DayForecast }) {
+function DayForecastView({
+  forecast,
+  locale,
+  t,
+}: {
+  forecast: DayForecast;
+  locale: AppLocale;
+  t: LocaleText;
+}) {
   const bestSample = forecast.best.sample;
 
   return (
@@ -1037,17 +1250,19 @@ function DayForecastView({ forecast }: { forecast: DayForecast }) {
         }}
       >
         <DecisionDeck
-          eyebrow={formatDateLabel(forecast.date)}
+          eyebrow={formatDateLabel(forecast.date, locale)}
+          locale={locale}
           sample={bestSample}
+          t={t}
           timezone={forecast.timezone}
-          title="Cea mai bună fereastră"
+          title={t.forecast.bestWindow}
           verdict={forecast.best.verdict}
         />
-        <DailyPulsePanel forecast={forecast} />
+        <DailyPulsePanel forecast={forecast} locale={locale} t={t} />
       </Box>
 
-      {bestSample ? <MetricGrid sample={bestSample} /> : null}
-      <LaunchWindowScanner forecast={forecast} />
+      {bestSample ? <MetricGrid locale={locale} sample={bestSample} t={t} /> : null}
+      <LaunchWindowScanner forecast={forecast} locale={locale} t={t} />
     </Stack>
   );
 }
@@ -1057,11 +1272,13 @@ function EmptyLocationPanel({
   notice,
   onLocate,
   onSelectSpot,
+  t,
 }: {
   locating: boolean;
   notice: string | null;
   onLocate: () => void;
   onSelectSpot: (spot: LocationChoice) => void;
+  t: LocaleText;
 }) {
   return (
     <PanelShell sx={{ p: { xs: 2, md: 3 }, minHeight: { xs: 620, md: 560 } }}>
@@ -1078,7 +1295,7 @@ function EmptyLocationPanel({
         <Stack spacing={2.1} sx={{ order: { xs: 2, md: 1 }, maxWidth: 560 }}>
           <Chip
             icon={<LogoMark size={18} />}
-            label="sistem pregătit pentru analiză"
+            label={t.empty.standby}
             sx={(theme) => ({
               alignSelf: "flex-start",
               color: theme.palette.mode === "light" ? "#075c63" : "#bffcff",
@@ -1086,11 +1303,10 @@ function EmptyLocationPanel({
           />
           <Box>
             <Typography variant="h2" component="h2" sx={{ fontSize: { xs: "1.6rem", sm: "2rem" }, overflowWrap: "anywhere" }}>
-              Calibrează zona de decolare
+              {t.empty.title}
             </Typography>
             <Typography sx={{ mt: 1, color: "text.secondary", fontSize: "0.98rem" }}>
-              Alege una dintre zonele populare de mai jos, caută o localitate sau activează poziția ta GPS.
-              Consola va genera instantaneu verdictul meteo pentru parapantă, semnalând riscurile critice.
+              {t.empty.body}
             </Typography>
           </Box>
 
@@ -1143,6 +1359,18 @@ function EmptyLocationPanel({
             </Box>
           </Box>
 
+          <Box
+            sx={{
+              display: "grid",
+              gap: 1,
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0, 1fr))" },
+            }}
+          >
+            <SignalMini icon={<AirIcon />} label={t.empty.wind} value={t.empty.uncalibrated} />
+            <SignalMini icon={<SpeedIcon />} label={t.empty.gusts} value={t.empty.uncalibrated} />
+            <SignalMini icon={<VisibilityIcon />} label={t.empty.visibility} value={t.empty.uncalibrated} />
+          </Box>
+
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={1}
@@ -1161,10 +1389,10 @@ function EmptyLocationPanel({
                 py: 1.2,
               }}
             >
-              Detectează poziția GPS
+              {t.empty.detectPosition}
             </Button>
             <Typography variant="body2" sx={{ color: "text.secondary", fontSize: "0.82rem" }}>
-              Coordonatele sunt folosite exclusiv pentru generarea prognozei meteo.
+              {t.empty.privacy}
             </Typography>
           </Stack>
         </Stack>
@@ -1180,56 +1408,30 @@ function EmptyLocationPanel({
 function LocationSummary({
   location,
   snapshot,
+  t,
 }: {
   location: LocationChoice | null;
   snapshot?: CurrentSnapshot;
+  t: LocaleText;
 }) {
   if (!location) {
     return (
-      <Box
-        sx={(theme) => ({
-          px: 1.5,
-          py: 1,
-          borderRadius: 2,
-          border: `1px dashed ${alpha(theme.palette.primary.main, 0.28)}`,
-          background: alpha(theme.palette.primary.main, 0.04),
-          display: "flex",
-          alignItems: "center",
-          gap: 1,
-        })}
-      >
-        <PlaceIcon sx={{ color: "text.secondary", fontSize: 20 }} />
-        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          Nicio zonă selectată
-        </Typography>
-      </Box>
+      <Chip
+        icon={<PlaceIcon />}
+        label={t.location.uncalibratedCoordinates}
+        sx={{ justifyContent: "flex-start", maxWidth: "100%" }}
+      />
     );
   }
 
+  const locationName = location.source === "gps" ? t.location.currentPosition : location.name;
+
   return (
-    <Box
-      sx={(theme) => ({
-        px: 1.5,
-        py: 0.8,
-        borderRadius: 2,
-        border: `1px solid ${alpha(theme.palette.primary.main, 0.36)}`,
-        background: alpha(theme.palette.primary.main, 0.08),
-        display: "flex",
-        alignItems: "center",
-        gap: 1,
-        minWidth: 0,
-      })}
-    >
-      <PlaceIcon sx={{ color: "primary.main", fontSize: 20 }} />
-      <Box sx={{ minWidth: 0 }}>
-        <Typography noWrap sx={{ fontWeight: 800, fontSize: "0.92rem" }}>
-          {location.name}
-        </Typography>
-        <Typography noWrap variant="body2" sx={{ color: "text.secondary", fontSize: "0.78rem" }}>
-          {location.detail ?? snapshot?.timezone ?? `${location.latitude.toFixed(2)}, ${location.longitude.toFixed(2)}`}
-        </Typography>
-      </Box>
-    </Box>
+    <Chip
+      icon={<PlaceIcon />}
+      label={[locationName, snapshot?.timezone ?? location.detail].filter(Boolean).join(" / ")}
+      sx={{ justifyContent: "flex-start", maxWidth: "100%" }}
+    />
   );
 }
 
@@ -1269,13 +1471,17 @@ function FeatureExplanationCard({
 
 function DecisionDeck({
   eyebrow,
+  locale,
   sample,
+  t,
   timezone,
   title,
   verdict,
 }: {
   eyebrow: string;
+  locale: AppLocale;
   sample: WeatherSample | null;
+  t: LocaleText;
   timezone: string;
   title: string;
   verdict: FlightVerdict;
@@ -1284,7 +1490,7 @@ function DecisionDeck({
   const tone = statusTone(verdict.status, theme.palette.mode);
   const cautionTone = statusTone("marginal", theme.palette.mode);
   const isLight = theme.palette.mode === "light";
-  const primaryReasons = verdict.reasons.length > 0 ? verdict.reasons : ["Nu există motive critice raportate."];
+  const primaryReasons = verdict.reasons.length > 0 ? verdict.reasons : [t.decision.noCriticalReasons];
 
   return (
     <PanelShell
@@ -1337,7 +1543,7 @@ function DecisionDeck({
           zIndex: 1,
         }}
       >
-        <ScoreOrb score={verdict.score} status={verdict.status} />
+        <ScoreOrb score={verdict.score} status={verdict.status} t={t} />
         <Stack spacing={1.45}>
           <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", alignItems: "center" }}>
             <Chip
@@ -1350,7 +1556,7 @@ function DecisionDeck({
               }}
             />
             <Chip
-              label={tone.label}
+              label={statusText(verdict.status, t)}
               size="small"
               sx={{ color: tone.color, background: tone.dim, borderColor: tone.color }}
             />
@@ -1376,20 +1582,20 @@ function DecisionDeck({
             <SignalMini
               compact
               icon={<TimelineIcon />}
-              label="Eșantion"
-              value={sample ? formatTime(sample.time, timezone) : "n/d"}
+              label={t.decision.sample}
+              value={sample ? formatTime(sample.time, timezone, locale) : t.common.notAvailable}
             />
             <SignalMini
               compact
               icon={<AirIcon />}
-              label="Vânt"
-              value={sample ? numberLabel(sample.windSpeed, "km/h") : "n/d"}
+              label={t.decision.wind}
+              value={sample ? numberLabel(sample.windSpeed, "km/h", 0, locale) : t.common.notAvailable}
             />
             <SignalMini
               compact
               icon={<SpeedIcon />}
-              label="Rafală"
-              value={sample ? numberLabel(sample.windGusts, "km/h") : "n/d"}
+              label={t.decision.gust}
+              value={sample ? numberLabel(sample.windGusts, "km/h", 0, locale) : t.common.notAvailable}
             />
           </Stack>
           <Stack spacing={0.8}>
@@ -1412,8 +1618,7 @@ function DecisionDeck({
             }}
           >
             <Typography variant="body2">
-              Ajutor de decizie, nu autorizare de zbor. Confirmă vântul real la decolare,
-              rotorul, dezvoltarea convectivă, regulile zonei și limitele tale de pilot.
+              {t.decision.disclaimer}
             </Typography>
           </Box>
         </Stack>
@@ -1422,7 +1627,15 @@ function DecisionDeck({
   );
 }
 
-function AtmospherePanel({ snapshot }: { snapshot: CurrentSnapshot }) {
+function AtmospherePanel({
+  locale,
+  snapshot,
+  t,
+}: {
+  locale: AppLocale;
+  snapshot: CurrentSnapshot;
+  t: LocaleText;
+}) {
   const { sample } = snapshot;
   const gustSpread =
     sample.windSpeed !== null && sample.windGusts !== null
@@ -1433,8 +1646,12 @@ function AtmospherePanel({ snapshot }: { snapshot: CurrentSnapshot }) {
     <PanelShell sx={{ p: { xs: 1.6, md: 2.2 }, minHeight: 356 }}>
       <Box sx={{ position: "relative", zIndex: 1 }}>
         <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", mb: 1.5 }}>
-          <Chip icon={<SatelliteAltIcon />} size="small" label="telemetrie atmosferă" />
-          <Chip icon={<TerrainIcon />} size="small" label={`grid ${numberLabel(snapshot.elevation, "m")}`} />
+          <Chip icon={<SatelliteAltIcon />} size="small" label={t.atmosphere.telemetry} />
+          <Chip
+            icon={<TerrainIcon />}
+            size="small"
+            label={t.atmosphere.grid(numberLabel(snapshot.elevation, "m", 0, locale))}
+          />
         </Stack>
         <Box
           sx={{
@@ -1444,14 +1661,14 @@ function AtmospherePanel({ snapshot }: { snapshot: CurrentSnapshot }) {
             alignItems: "center",
           }}
         >
-          <WindDial sample={sample} />
+          <WindDial locale={locale} sample={sample} t={t} />
           <Stack spacing={1.35}>
             <Box>
               <Typography component="h2" variant="h2">
                 {sample.weatherLabel}
               </Typography>
               <Typography sx={{ color: "text.secondary", mt: 0.4 }}>
-                Actualizat la {formatTime(sample.time, snapshot.timezone)}, ora locală
+                {t.atmosphere.updatedAt(formatTime(sample.time, snapshot.timezone, locale))}
               </Typography>
             </Box>
             <Box
@@ -1461,14 +1678,29 @@ function AtmospherePanel({ snapshot }: { snapshot: CurrentSnapshot }) {
                 gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(2, minmax(0, 1fr))" },
               }}
             >
-              <SignalMini icon={<DeviceThermostatIcon />} label="Temperatură" value={numberLabel(sample.temperature, "C", 1)} />
-              <SignalMini icon={<NavigationIcon />} label="Direcție" value={windDirectionLabel(sample.windDirection)} />
-              <SignalMini icon={<SpeedIcon />} label="Spread rafale" value={numberLabel(gustSpread, "km/h")} />
-              <SignalMini icon={<ThunderstormIcon />} label="CAPE" value={numberLabel(sample.cape, "J/kg")} />
+              <SignalMini
+                icon={<DeviceThermostatIcon />}
+                label={t.atmosphere.temperature}
+                value={numberLabel(sample.temperature, "C", 1, locale)}
+              />
+              <SignalMini
+                icon={<NavigationIcon />}
+                label={t.atmosphere.direction}
+                value={windDirectionLabel(sample.windDirection, locale)}
+              />
+              <SignalMini
+                icon={<SpeedIcon />}
+                label={t.atmosphere.gustSpread}
+                value={numberLabel(gustSpread, "km/h", 0, locale)}
+              />
+              <SignalMini
+                icon={<ThunderstormIcon />}
+                label="CAPE"
+                value={numberLabel(sample.cape, "J/kg", 0, locale)}
+              />
             </Box>
             <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Modelul citește vântul la 10 m. Dacă valea, creasta sau briza termică diferă,
-              prioritatea rămâne măsurarea reală din teren.
+              {t.atmosphere.modelNote}
             </Typography>
           </Stack>
         </Box>
@@ -1477,18 +1709,34 @@ function AtmospherePanel({ snapshot }: { snapshot: CurrentSnapshot }) {
   );
 }
 
-function DailyPulsePanel({ forecast }: { forecast: DayForecast }) {
+function DailyPulsePanel({
+  forecast,
+  locale,
+  t,
+}: {
+  forecast: DayForecast;
+  locale: AppLocale;
+  t: LocaleText;
+}) {
   return (
     <PanelShell sx={{ p: { xs: 1.6, md: 2.2 }, minHeight: 356 }}>
       <Stack spacing={1.8} sx={{ position: "relative", zIndex: 1 }}>
         <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
-          <Chip icon={<DataUsageIcon />} size="small" label="sumar zi" />
-          <Chip icon={<WbSunnyIcon />} size="small" label={`${formatTime(forecast.daily.sunrise, forecast.timezone)} - ${formatTime(forecast.daily.sunset, forecast.timezone)}`} />
+          <Chip icon={<DataUsageIcon />} size="small" label={t.daily.summary} />
+          <Chip
+            icon={<WbSunnyIcon />}
+            size="small"
+            label={`${formatTime(forecast.daily.sunrise, forecast.timezone, locale)} - ${formatTime(
+              forecast.daily.sunset,
+              forecast.timezone,
+              locale,
+            )}`}
+          />
         </Stack>
         <Box>
           <Typography variant="h2">{forecast.daily.weatherLabel}</Typography>
           <Typography sx={{ mt: 0.6, color: "text.secondary" }}>
-            Profilul zilei pentru deplasare, briefing și alegerea ferestrei de lansare.
+            {t.daily.profile}
           </Typography>
         </Box>
         <Box
@@ -1498,79 +1746,98 @@ function DailyPulsePanel({ forecast }: { forecast: DayForecast }) {
             gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, minmax(0, 1fr))" },
           }}
         >
-          <MiniMetric label="Temperatură" value={`${numberLabel(forecast.daily.temperatureMin, "C")} / ${numberLabel(forecast.daily.temperatureMax, "C")}`} />
-          <MiniMetric label="Vânt max." value={numberLabel(forecast.daily.windSpeedMax, "km/h")} />
-          <MiniMetric label="Rafală max." value={numberLabel(forecast.daily.windGustsMax, "km/h")} />
-          <MiniMetric label="Risc ploaie" value={percentLabel(forecast.daily.precipitationProbabilityMax)} />
-          <MiniMetric label="Ploaie total" value={numberLabel(forecast.daily.precipitationSum, "mm", 1)} />
-          <MiniMetric label="UV max." value={numberLabel(forecast.daily.uvIndexMax, "", 1)} />
-          <MiniMetric label="Răsărit" value={formatTime(forecast.daily.sunrise, forecast.timezone)} />
-          <MiniMetric label="Apus" value={formatTime(forecast.daily.sunset, forecast.timezone)} />
+          <MiniMetric
+            label={t.daily.temperature}
+            value={`${numberLabel(forecast.daily.temperatureMin, "C", 0, locale)} / ${numberLabel(
+              forecast.daily.temperatureMax,
+              "C",
+              0,
+              locale,
+            )}`}
+          />
+          <MiniMetric label={t.daily.maxWind} value={numberLabel(forecast.daily.windSpeedMax, "km/h", 0, locale)} />
+          <MiniMetric label={t.daily.maxGust} value={numberLabel(forecast.daily.windGustsMax, "km/h", 0, locale)} />
+          <MiniMetric label={t.daily.rainRisk} value={percentLabel(forecast.daily.precipitationProbabilityMax, locale)} />
+          <MiniMetric label={t.daily.totalRain} value={numberLabel(forecast.daily.precipitationSum, "mm", 1, locale)} />
+          <MiniMetric label={t.daily.maxUv} value={numberLabel(forecast.daily.uvIndexMax, "", 1, locale)} />
+          <MiniMetric label={t.daily.sunrise} value={formatTime(forecast.daily.sunrise, forecast.timezone, locale)} />
+          <MiniMetric label={t.daily.sunset} value={formatTime(forecast.daily.sunset, forecast.timezone, locale)} />
         </Box>
       </Stack>
     </PanelShell>
   );
 }
 
-function MetricGrid({ sample }: { sample: WeatherSample }) {
+function MetricGrid({
+  locale,
+  sample,
+  t,
+}: {
+  locale: AppLocale;
+  sample: WeatherSample;
+  t: LocaleText;
+}) {
   const gustSpread =
     sample.windSpeed !== null && sample.windGusts !== null
       ? sample.windGusts - sample.windSpeed
       : null;
   const metrics = [
     {
-      label: "Vânt",
-      value: numberLabel(sample.windSpeed, "km/h"),
-      detail: `${windDirectionLabel(sample.windDirection)} la 10 m`,
+      label: t.metrics.wind,
+      value: numberLabel(sample.windSpeed, "km/h", 0, locale),
+      detail: t.metrics.atTenMeters(windDirectionLabel(sample.windDirection, locale)),
       icon: <AirIcon />,
       status: sample.windSpeed !== null && sample.windSpeed >= 8 && sample.windSpeed <= 22 ? "good" : "marginal",
     },
     {
-      label: "Rafale",
-      value: numberLabel(sample.windGusts, "km/h"),
-      detail: `spread ${numberLabel(gustSpread, "km/h")}`,
+      label: t.metrics.gusts,
+      value: numberLabel(sample.windGusts, "km/h", 0, locale),
+      detail: t.metrics.spread(numberLabel(gustSpread, "km/h", 0, locale)),
       icon: <SpeedIcon />,
       status: gustSpread !== null && gustSpread > 16 ? "no-go" : gustSpread !== null && gustSpread > 10 ? "marginal" : "good",
     },
     {
-      label: "Precipitații",
-      value: numberLabel(sample.precipitation, "mm", 1),
-      detail: `probabilitate ${percentLabel(sample.precipitationProbability)}`,
+      label: t.metrics.precipitation,
+      value: numberLabel(sample.precipitation, "mm", 1, locale),
+      detail: t.metrics.probability(percentLabel(sample.precipitationProbability, locale)),
       icon: <WaterDropIcon />,
       status: sample.precipitation !== null && sample.precipitation >= 0.2 ? "no-go" : "good",
     },
     {
-      label: "Vizibilitate",
-      value: distanceLabel(sample.visibility),
+      label: t.metrics.visibility,
+      value: distanceLabel(sample.visibility, locale),
       detail: sample.weatherLabel,
       icon: <VisibilityIcon />,
       status: sample.visibility !== null && sample.visibility < 5000 ? "no-go" : sample.visibility !== null && sample.visibility < 10000 ? "marginal" : "good",
     },
     {
-      label: "Nori",
-      value: percentLabel(sample.cloudCover),
-      detail: `CAPE ${numberLabel(sample.cape, "J/kg")}`,
+      label: t.metrics.clouds,
+      value: percentLabel(sample.cloudCover, locale),
+      detail: t.metrics.cape(numberLabel(sample.cape, "J/kg", 0, locale)),
       icon: <CloudIcon />,
       status: sample.cloudCover !== null && sample.cloudCover > 90 ? "marginal" : "good",
     },
     {
-      label: "Termic",
-      value: numberLabel(sample.temperature, "C", 1),
-      detail: `resimțit ${numberLabel(sample.apparentTemperature, "C", 1)}`,
+      label: t.metrics.thermal,
+      value: numberLabel(sample.temperature, "C", 1, locale),
+      detail: t.metrics.feelsLike(numberLabel(sample.apparentTemperature, "C", 1, locale)),
       icon: <DeviceThermostatIcon />,
       status: "good",
     },
     {
-      label: "Presiune",
-      value: numberLabel(sample.pressure, "hPa"),
-      detail: `umiditate ${percentLabel(sample.humidity)}`,
+      label: t.metrics.pressure,
+      value: numberLabel(sample.pressure, "hPa", 0, locale),
+      detail: t.metrics.humidity(percentLabel(sample.humidity, locale)),
       icon: <ThunderstormIcon />,
       status: "good",
     },
     {
-      label: "Aer + soare",
-      value: sample.usAqi === null ? `UV ${numberLabel(sample.uvIndex, "", 1)}` : `AQI ${Math.round(sample.usAqi)}`,
-      detail: `PM2.5 ${numberLabel(sample.pm25, "ug/m3", 1)}`,
+      label: t.metrics.airSun,
+      value:
+        sample.usAqi === null
+          ? t.metrics.uv(numberLabel(sample.uvIndex, "", 1, locale))
+          : t.metrics.aqi(sample.usAqi),
+      detail: t.metrics.pm25(numberLabel(sample.pm25, "ug/m3", 1, locale)),
       icon: <WbSunnyIcon />,
       status: sample.usAqi !== null && sample.usAqi > 150 ? "marginal" : "good",
     },
@@ -1667,7 +1934,15 @@ function MetricTile({
   );
 }
 
-function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
+function LaunchWindowScanner({
+  forecast,
+  locale,
+  t,
+}: {
+  forecast: DayForecast;
+  locale: AppLocale;
+  t: LocaleText;
+}) {
   const theme = useTheme();
   const isLight = theme.palette.mode === "light";
 
@@ -1675,15 +1950,15 @@ function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
     <PanelShell sx={{ p: { xs: 1.5, md: 2 } }}>
       <Stack spacing={1.5} sx={{ position: "relative", zIndex: 1 }}>
         <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", alignItems: "center" }}>
-          <Chip icon={<TimelineIcon />} label="ferestre de lansare" />
+          <Chip icon={<TimelineIcon />} label={t.scanner.title} />
           <Typography sx={{ color: "text.secondary" }}>
-            orele de lumină sortate după scor și risc
+            {t.scanner.subtitle}
           </Typography>
         </Stack>
 
         {forecast.topWindows.length === 0 ? (
           <Alert severity="warning" sx={alertSx("warning")}>
-            Nicio oră cu lumină nu trece de filtrele conservatoare pentru vânt, vreme și vizibilitate.
+            {t.scanner.empty}
           </Alert>
         ) : (
           <Stack spacing={1}>
@@ -1709,7 +1984,7 @@ function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
                   }}
                 >
                   <Typography sx={{ fontWeight: 900, color: "text.primary" }}>
-                    {formatTime(sample.time, forecast.timezone)}
+                    {formatTime(sample.time, forecast.timezone, locale)}
                   </Typography>
                   <Box>
                     <Typography variant="body2" sx={{ color: tone.color, fontWeight: 900 }}>
@@ -1735,10 +2010,13 @@ function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
                     </Box>
                   </Box>
                   <Typography sx={{ color: "text.secondary" }}>
-                    Vânt {numberLabel(sample.windSpeed, "km/h")} / rafală {numberLabel(sample.windGusts, "km/h")}
+                    {t.scanner.windGust(
+                      numberLabel(sample.windSpeed, "km/h", 0, locale),
+                      numberLabel(sample.windGusts, "km/h", 0, locale),
+                    )}
                   </Typography>
                   <Typography sx={{ color: "text.secondary" }}>
-                    {sample.weatherLabel}, ploaie {percentLabel(sample.precipitationProbability)}
+                    {sample.weatherLabel}, {t.scanner.rain(percentLabel(sample.precipitationProbability, locale))}
                   </Typography>
                 </Box>
               );
@@ -1750,7 +2028,15 @@ function LaunchWindowScanner({ forecast }: { forecast: DayForecast }) {
   );
 }
 
-function ScoreOrb({ score, status }: { score: number; status: FlightStatus }) {
+function ScoreOrb({
+  score,
+  status,
+  t,
+}: {
+  score: number;
+  status: FlightStatus;
+  t: LocaleText;
+}) {
   const theme = useTheme();
   const tone = statusTone(status, theme.palette.mode);
   const isLight = theme.palette.mode === "light";
@@ -1758,7 +2044,7 @@ function ScoreOrb({ score, status }: { score: number; status: FlightStatus }) {
 
   return (
     <Box
-      aria-label={`Scor parapantabil ${score} din 100`}
+      aria-label={t.common.scoreOutOf100(score)}
       role="img"
       sx={{
         width: 176,
@@ -1802,14 +2088,22 @@ function ScoreOrb({ score, status }: { score: number; status: FlightStatus }) {
           {score}
         </Typography>
         <Typography variant="body2" sx={{ color: "text.secondary", fontWeight: 900 }}>
-          /100
+          {t.common.scoreDenominator}
         </Typography>
       </Stack>
     </Box>
   );
 }
 
-function WindDial({ sample }: { sample: WeatherSample }) {
+function WindDial({
+  locale,
+  sample,
+  t,
+}: {
+  locale: AppLocale;
+  sample: WeatherSample;
+  t: LocaleText;
+}) {
   const theme = useTheme();
   const isLight = theme.palette.mode === "light";
   const rotation = sample.windDirection ?? 0;
@@ -1823,7 +2117,12 @@ function WindDial({ sample }: { sample: WeatherSample }) {
 
   return (
     <Box
-      aria-label={`Vânt ${windDirectionLabel(sample.windDirection)} ${numberLabel(sample.windSpeed, "km/h")}`}
+      aria-label={`${t.metrics.wind} ${windDirectionLabel(sample.windDirection, locale)} ${numberLabel(
+        sample.windSpeed,
+        "km/h",
+        0,
+        locale,
+      )}`}
       role="img"
       sx={{
         width: 190,
@@ -1842,25 +2141,30 @@ function WindDial({ sample }: { sample: WeatherSample }) {
         mx: { xs: "auto", sm: 0 },
       }}
     >
-      {["N", "E", "S", "V"].map((point) => (
+      {[
+        { key: "n", label: t.directions.n },
+        { key: "e", label: t.directions.e },
+        { key: "s", label: t.directions.s },
+        { key: "w", label: t.directions.w },
+      ].map((point) => (
         <Typography
-          key={point}
+          key={point.key}
           variant="body2"
           sx={{
             color: isLight ? "#075c63" : "#dffcff",
             fontWeight: 900,
             position: "absolute",
-            top: point === "N" ? 12 : point === "S" ? "auto" : "50%",
-            bottom: point === "S" ? 12 : "auto",
-            left: point === "V" ? 14 : point === "E" ? "auto" : "50%",
-            right: point === "E" ? 14 : "auto",
+            top: point.key === "n" ? 12 : point.key === "s" ? "auto" : "50%",
+            bottom: point.key === "s" ? 12 : "auto",
+            left: point.key === "w" ? 14 : point.key === "e" ? "auto" : "50%",
+            right: point.key === "e" ? 14 : "auto",
             transform:
-              point === "N" || point === "S"
+              point.key === "n" || point.key === "s"
                 ? "translateX(-50%)"
                 : "translateY(-50%)",
           }}
         >
-          {point}
+          {point.label}
         </Typography>
       ))}
       <Box
@@ -1887,10 +2191,10 @@ function WindDial({ sample }: { sample: WeatherSample }) {
       />
       <Stack spacing={0.2} sx={{ position: "absolute", alignItems: "center" }}>
         <Typography variant="h3" sx={{ color: tone.color, fontSize: "1.55rem" }}>
-          {windDirectionLabel(sample.windDirection)}
+          {windDirectionLabel(sample.windDirection, locale)}
         </Typography>
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          {numberLabel(sample.windSpeed, "km/h")}
+          {numberLabel(sample.windSpeed, "km/h", 0, locale)}
         </Typography>
       </Stack>
     </Box>
@@ -2162,17 +2466,23 @@ function HolographicLaunchMap() {
   );
 }
 
-function romanianSource(source: string) {
-  if (source.includes("Air Quality")) return "calitate aer Open-Meteo";
-  if (source.includes("Forecast")) return "prognoză Open-Meteo";
-  if (source.includes("Geocoding")) return "hartă Open-Meteo";
-  if (source.includes("GPS")) return "GPS browser";
+function statusText(status: FlightStatus, t: LocaleText) {
+  if (status === "good") return t.statusTone.good;
+  if (status === "marginal") return t.statusTone.marginal;
+  return t.statusTone.noGo;
+}
+
+function sourceLabel(source: string, t: LocaleText) {
+  if (source.includes("Air Quality")) return t.sources.airQuality;
+  if (source.includes("Forecast")) return t.sources.forecast;
+  if (source.includes("Geocoding")) return t.sources.geocoding;
+  if (source.includes("GPS")) return t.sources.gps;
   return source;
 }
 
-function distanceLabel(value: number | null) {
-  if (value === null) return "n/d";
-  return `${new Intl.NumberFormat("ro-RO", {
+function distanceLabel(value: number | null, locale: AppLocale) {
+  if (value === null) return getTranslations(locale).common.notAvailable;
+  return `${new Intl.NumberFormat(locale, {
     minimumFractionDigits: 1,
     maximumFractionDigits: 1,
   }).format(value / 1000)} km`;
