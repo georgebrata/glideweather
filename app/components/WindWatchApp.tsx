@@ -41,6 +41,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from "react";
@@ -407,12 +408,16 @@ function WindWatchDashboard({
   const [location, setLocation] = useState<LocationChoice | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [locating, setLocating] = useState(false);
-  const [locationNotice, setLocationNotice] = useState<string | null>(null);
+  const [locationNotice, setLocationNotice] = useState<"unavailable" | "denied" | null>(null);
+  const localeRef = useRef(locale);
+  useEffect(() => {
+    localeRef.current = locale;
+  }, [locale]);
   const [searchText, setSearchText] = useState("");
 
   const requestLocation = useCallback(() => {
     if (!navigator.geolocation) {
-      setLocationNotice(t.location.unavailable);
+      setLocationNotice("unavailable");
       setLocation(null);
       return;
     }
@@ -423,7 +428,7 @@ function WindWatchDashboard({
         const { latitude, longitude } = position.coords;
         setLocation({
           id: `gps-${latitude.toFixed(4)}-${longitude.toFixed(4)}`,
-          name: t.location.currentPosition,
+          name: getTranslations(localeRef.current).location.currentPosition,
           detail: `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`,
           latitude,
           longitude,
@@ -435,7 +440,7 @@ function WindWatchDashboard({
       },
       () => {
         setLocationNotice(
-          t.location.permissionDenied,
+          "denied",
         );
         setLocation(null);
         setActiveTab(0);
@@ -443,7 +448,7 @@ function WindWatchDashboard({
       },
       { enableHighAccuracy: false, maximumAge: 1000 * 60 * 10, timeout: 10000 },
     );
-  }, [t.location.currentPosition, t.location.permissionDenied, t.location.unavailable]);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(requestLocation, 0);
@@ -501,7 +506,7 @@ function WindWatchDashboard({
 
         {locationNotice ? (
           <Alert severity="warning" onClose={() => setLocationNotice(null)} sx={alertSx("warning")}>
-            {locationNotice}
+            {locationNotice === "unavailable" ? t.location.unavailable : t.location.permissionDenied}
           </Alert>
         ) : null}
 
@@ -1341,6 +1346,7 @@ function LanguagePicker({
         clearText={t.language.clear}
         closeText={t.language.close}
         disableClearable
+        filterOptions={(options) => options}
         getOptionKey={(option) => option.code}
         getOptionLabel={getLocaleOptionLabel}
         inputValue={getLocaleButtonLabel(locale)}
@@ -1356,6 +1362,7 @@ function LanguagePicker({
             aria-label={t.language.label}
             size="small"
             slotProps={{
+              ...params.slotProps,
               input: {
                 ...params.slotProps.input,
                 startAdornment: (
