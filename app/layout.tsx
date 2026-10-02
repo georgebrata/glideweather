@@ -1,6 +1,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import { MARK_SRC, PRODUCT_NAME, resolveSiteOrigin } from "./brand";
 import { DEFAULT_LOCALE, getTranslations } from "./i18n";
 import "./globals.css";
@@ -52,6 +53,7 @@ export default function RootLayout({
         <ClerkProvider>
           {children}
         </ClerkProvider>
+        <Analytics />
       </body>
     </html>
   );
