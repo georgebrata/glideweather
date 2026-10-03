@@ -14,7 +14,7 @@ Browser (React Query)
   → UI
 ```
 
-Geocoding and the map wind grid remain on Open-Meteo (`searchLocations`, `fetchWindGrid`).
+Geocoding stays on Open-Meteo (`searchLocations`). The dashboard map uses Mapbox GL JS (Standard style); wind barbs on the map call Open-Meteo `fetchWindGrid` only in wind mode and only once per rounded coordinate.
 
 ## Why Meteoblue primary
 

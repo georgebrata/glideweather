@@ -27,7 +27,7 @@
     "drizzle-orm": "0.45.2",
     "flags": "^4.3.1",
     "lucide-react": "^1.50.0",
-    "maplibre-gl": "^6.11.2",
+    "mapbox-gl": "^3.32.0",
     "next": "16.2.6",
     "radix-ui": "^1.6.7",
     "react": "19.2.6",

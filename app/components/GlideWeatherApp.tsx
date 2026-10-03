@@ -2,6 +2,7 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Alert, AlertDescription } from "@/app/components/ui/alert";
 import { Skeleton } from "@/app/components/ui/skeleton";
@@ -25,7 +26,13 @@ import { flightTokensByMode, type ThemeMode } from "../theme/flightTokens";
 import { AppProviders } from "./AppProviders";
 import { AppHeader } from "./dashboard/AppHeader";
 import { ForecastDrawer } from "./dashboard/ForecastDrawer";
-import { FlightMap } from "./dashboard/FlightMap";
+const FlightMap = dynamic(
+  () => import("./dashboard/FlightMap").then((module) => ({ default: module.FlightMap })),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-[420px] w-full rounded-none" />,
+  },
+);
 import { FlightStatusPanel } from "./dashboard/FlightStatusPanel";
 import { useLocaleText } from "./dashboard/LocaleContext";
 import { SitesDrawer } from "./dashboard/SitesDrawer";
@@ -40,17 +47,22 @@ import {
 
 type GlideWeatherAppProps = {
   authEnabled: boolean;
+  mapboxAccessToken: string;
 };
 
-export default function GlideWeatherApp({ authEnabled: authOn }: GlideWeatherAppProps) {
+export default function GlideWeatherApp({ authEnabled: authOn, mapboxAccessToken }: GlideWeatherAppProps) {
   return (
     <AppProviders>
-      {authOn ? <DashboardRootWithAuth /> : <DashboardRootPublic />}
+      {authOn ? (
+        <DashboardRootWithAuth mapboxAccessToken={mapboxAccessToken} />
+      ) : (
+        <DashboardRootPublic mapboxAccessToken={mapboxAccessToken} />
+      )}
     </AppProviders>
   );
 }
 
-function DashboardRootPublic() {
+function DashboardRootPublic({ mapboxAccessToken }: { mapboxAccessToken: string }) {
   const { locale } = useLocaleText();
   const themeMode = useSyncExternalStore(subscribeThemeMode, readInitialThemeMode, getServerThemeMode);
   const setLocale = useCallback((nextLocale: typeof locale) => {
@@ -72,11 +84,12 @@ function DashboardRootPublic() {
       setLocale={setLocale}
       themeMode={themeMode}
       toggleThemeMode={toggleThemeMode}
+      mapboxAccessToken={mapboxAccessToken}
     />
   );
 }
 
-function DashboardRootWithAuth() {
+function DashboardRootWithAuth({ mapboxAccessToken }: { mapboxAccessToken: string }) {
   const { locale } = useLocaleText();
   const { isLoaded: authLoaded, isSignedIn, user } = useUser();
   const themeMode = useSyncExternalStore(subscribeThemeMode, readInitialThemeMode, getServerThemeMode);
@@ -102,6 +115,7 @@ function DashboardRootWithAuth() {
       setLocale={setLocale}
       themeMode={themeMode}
       toggleThemeMode={toggleThemeMode}
+      mapboxAccessToken={mapboxAccessToken}
     />
   );
 }
@@ -115,6 +129,7 @@ function FlightWindowDashboard({
   setLocale,
   themeMode,
   toggleThemeMode,
+  mapboxAccessToken,
 }: {
   authEnabled: boolean;
   authLoaded: boolean;
@@ -124,6 +139,7 @@ function FlightWindowDashboard({
   setLocale: (locale: ReturnType<typeof readInitialLocale>) => void;
   themeMode: ThemeMode;
   toggleThemeMode: () => void;
+  mapboxAccessToken: string;
 }) {
   const { t } = useLocaleText();
   const tokens = flightTokensByMode[themeMode];
@@ -291,6 +307,7 @@ function FlightWindowDashboard({
               <Skeleton className="h-[420px] w-full rounded-none" />
             ) : (
               <FlightMap
+                accessToken={mapboxAccessToken}
                 location={location}
                 themeMode={themeMode}
                 onLocationChange={selectLocation}
