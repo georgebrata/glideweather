@@ -1,8 +1,8 @@
 "use client";
 
 import { ChevronRight, MapPin, Mountain, Wind } from "lucide-react";
-import type { GeoJSONSource, Map as MapboxMap, Marker } from "mapbox-gl";
 import * as mapboxgl from "mapbox-gl/esm";
+import type { GeoJSONSource, Map as MapboxMap, Marker } from "mapbox-gl/esm";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/app/components/ui/button";

@@ -13,6 +13,7 @@ import {
   storedLocationToChoice,
   updateUserPreferences,
 } from "../lib/userPreferences";
+import { trackSearch } from "../lib/analytics";
 import {
   dateForOffset,
   fetchCurrentSnapshot,
@@ -181,6 +182,7 @@ function FlightWindowDashboard({
         setLocationNotice(null);
         setActiveTab(0);
         setLocating(false);
+        trackSearch("browser");
       },
       () => {
         setLocationNotice("denied");
@@ -256,6 +258,22 @@ function FlightWindowDashboard({
     setSearchText("");
   }, []);
 
+  const selectLocationFromSearch = useCallback(
+    (next: LocationChoice) => {
+      trackSearch("result");
+      selectLocation(next);
+    },
+    [selectLocation],
+  );
+
+  const selectLocationFromMap = useCallback(
+    (next: LocationChoice) => {
+      trackSearch("map");
+      selectLocation(next);
+    },
+    [selectLocation],
+  );
+
   const modelUpdatedLabel = currentQuery.data
     ? t.flightWindow.modelUpdated(formatTime(currentQuery.data.sample.time, currentQuery.data.timezone, locale))
     : null;
@@ -270,7 +288,7 @@ function FlightWindowDashboard({
           authEnabled={authEnabled}
           locating={locating}
           onRequestLocation={requestLocation}
-          onSelectLocation={selectLocation}
+          onSelectLocation={selectLocationFromSearch}
           searchData={searchQuery.data ?? []}
           searchFetching={searchQuery.isFetching}
           searchText={searchText}
@@ -310,7 +328,7 @@ function FlightWindowDashboard({
                 accessToken={mapboxAccessToken}
                 location={location}
                 themeMode={themeMode}
-                onLocationChange={selectLocation}
+                onLocationChange={selectLocationFromMap}
                 onOpenSites={() => setSitesOpen(true)}
               />
             )}
