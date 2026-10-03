@@ -1,6 +1,6 @@
 # GlideWeather
 
-**GlideWeather** is a real-time weather console for paragliding pilots. It aggregates weather, air quality, and geocoding from Open-Meteo into a conservative launch verdict. The interface is English by default and Romanian for Romanian locales. Place search works worldwide.
+**GlideWeather** is a real-time weather console for paragliding pilots. It aggregates forecast data from **meteoblue** (primary, server-side) with **Open-Meteo** as automatic fallback, plus Open-Meteo air quality and geocoding, into a conservative launch verdict. The interface is English by default and Romanian for Romanian locales. Place search works worldwide.
 
 - Production: [glideweather.app](https://glideweather.app)
 - Test: [glideweather.vercel.app](https://glideweather.vercel.app)
@@ -53,10 +53,13 @@ This application synthesizes key flight parameters into a single actionable sign
 - **[TanStack React Query v5](https://tanstack.com/query)** – Query caching, background refetching, and stale-time management
 - **[Zod v4](https://zod.dev/)** – Strict schema parsing and validation for API responses
 
-### Weather Data APIs (Open-Meteo)
-- **Open-Meteo Forecast API:** Current weather, hourly forecasts, wind speed/direction at 10m, gust speed, CAPE, precipitation, and visibility
-- **Open-Meteo Air Quality API:** AQI, PM2.5, PM10, and UV index
+### Weather Data APIs
+- **meteoblue Forecast API (primary):** `basic-1h`, `wind-3h`, `clouds-3h`, `air-3h` packages via `/api/weather` (requires `METEOBLUE_API_KEY` on the server)
+- **Open-Meteo Forecast API (fallback):** Same normalized domain model when Meteoblue fails or the key is unset
+- **Open-Meteo Air Quality API:** AQI, PM2.5, PM10, and UV index (alongside either forecast provider)
 - **Open-Meteo Geocoding API:** Location search and coordinate lookup
+
+See [docs/weather.md](docs/weather.md) for architecture, field mapping, and flight-intelligence rules.
 
 ### Persistence & Storage (Prepared)
 - **Drizzle ORM** (`drizzle-orm`, `drizzle-kit`) with Cloudflare D1 support
@@ -106,7 +109,9 @@ npm run build
 │   ├── components/
 │   │   └── GlideWeatherApp.tsx       # Dashboard: location controls, verdict, launch windows
 │   ├── lib/
-│   │   └── weather.ts                # API client, Zod schemas, flight decision algorithm & types
+│   │   ├── weather.ts                # Client facade (calls /api/weather)
+│   │   └── weather/                  # Domain, Meteoblue, Open-Meteo, service layer
+│   ├── api/weather/route.ts          # Server weather endpoint
 │   ├── brand.ts                      # Product name, verdict titles, metadata copy
 │   ├── globals.css                   # Global styles & Tailwind import
 │   ├── layout.tsx                    # Root Next.js layout

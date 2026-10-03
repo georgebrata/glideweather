@@ -200,14 +200,22 @@ const ForecastDayDetail = ({
 
 const DailySummary = ({ forecast }: { forecast: DayForecast }) => {
   const { locale, t } = useLocaleText();
+  const sunSuffix = forecast.daily.sunriseCalculated ? ` (${t.metrics.calculatedSun})` : "";
   const parts = [
     `${t.daily.temperature} ${numberLabel(forecast.daily.temperatureMin, "C", 0, locale)} / ${numberLabel(forecast.daily.temperatureMax, "C", 0, locale)}`,
     `${t.daily.maxWind} ${numberLabel(forecast.daily.windSpeedMax, "km/h", 0, locale)}`,
     `${t.daily.maxGust} ${numberLabel(forecast.daily.windGustsMax, "km/h", 0, locale)}`,
     `${t.console.rain} ${percentLabel(forecast.daily.precipitationProbabilityMax, locale)}`,
-    `${formatTime(forecast.daily.sunrise, forecast.timezone, locale)}–${formatTime(forecast.daily.sunset, forecast.timezone, locale)}`,
+    `${formatTime(forecast.daily.sunrise, forecast.timezone, locale)}–${formatTime(forecast.daily.sunset, forecast.timezone, locale)}${sunSuffix}`,
   ];
-  return <p className="text-sm text-muted-foreground">{parts.join(" · ")}</p>;
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-sm text-muted-foreground">{parts.join(" · ")}</p>
+      {forecast.daily.predictabilityCaution ? (
+        <p className="text-sm text-muted-foreground">{t.metrics.predictabilityLow}</p>
+      ) : null}
+    </div>
+  );
 };
 
 const VerdictPanel = ({
@@ -257,6 +265,10 @@ const VerdictPanel = ({
 
 const DetailRow = ({ sample, timezone }: { sample: WeatherSample; timezone: string }) => {
   const { locale, t } = useLocaleText();
+  const gustNote =
+    sample.windGustOrigin === "latest-within-3h" && sample.windGustSourceTime
+      ? t.metrics.gustFromTime(formatTime(sample.windGustSourceTime, timezone, locale))
+      : null;
   return (
     <div className={panelClass}>
       <div className="flex flex-col gap-3">
@@ -264,6 +276,7 @@ const DetailRow = ({ sample, timezone }: { sample: WeatherSample; timezone: stri
         <p className="text-sm text-muted-foreground">
           {t.atmosphere.updatedAt(formatTime(sample.time, timezone, locale))}
         </p>
+        {gustNote ? <p className="text-sm text-muted-foreground">{gustNote}</p> : null}
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
           <Fact label={t.atmosphere.direction} value={windDirectionLabel(sample.windDirection, locale)} />
           <Fact label={t.atmosphere.temperature} value={numberLabel(sample.temperature, "C", 1, locale)} />
@@ -320,8 +333,32 @@ const ExtraMetrics = ({ sample }: { sample: WeatherSample }) => {
   const { locale, t } = useLocaleText();
   const items = [
     { label: t.metrics.pressure, value: numberLabel(sample.pressure, "hPa", 0, locale) },
+    ...(sample.seaLevelPressureHpa !== null && sample.seaLevelPressureHpa !== undefined
+      ? [{ label: t.metrics.seaLevelPressure, value: numberLabel(sample.seaLevelPressureHpa, "hPa", 0, locale) }]
+      : []),
     { label: t.console.humidity, value: percentLabel(sample.humidity, locale) },
     { label: t.metrics.clouds, value: percentLabel(sample.cloudCover, locale) },
+    ...(sample.cloudCoverLow !== null && sample.cloudCoverLow !== undefined
+      ? [{ label: t.metrics.cloudLow, value: percentLabel(sample.cloudCoverLow, locale) }]
+      : []),
+    ...(sample.cloudCoverMid !== null && sample.cloudCoverMid !== undefined
+      ? [{ label: t.metrics.cloudMid, value: percentLabel(sample.cloudCoverMid, locale) }]
+      : []),
+    ...(sample.cloudCoverHigh !== null && sample.cloudCoverHigh !== undefined
+      ? [{ label: t.metrics.cloudHigh, value: percentLabel(sample.cloudCoverHigh, locale) }]
+      : []),
+    ...(sample.windSpeed80mKmh !== null && sample.windSpeed80mKmh !== undefined
+      ? [{ label: t.metrics.wind80m, value: numberLabel(sample.windSpeed80mKmh, "km/h", 0, locale) }]
+      : []),
+    ...(sample.liftedIndex !== null && sample.liftedIndex !== undefined
+      ? [{ label: t.metrics.liftedIndex, value: numberLabel(sample.liftedIndex, "", 1, locale) }]
+      : []),
+    ...(sample.boundaryLayerHeightM !== null && sample.boundaryLayerHeightM !== undefined
+      ? [{ label: t.metrics.boundaryLayer, value: numberLabel(sample.boundaryLayerHeightM, "m", 0, locale) }]
+      : []),
+    ...(sample.convectiveInhibitionJkg !== null && sample.convectiveInhibitionJkg !== undefined
+      ? [{ label: t.metrics.convectiveInhibition, value: numberLabel(sample.convectiveInhibitionJkg, "J/kg", 0, locale) }]
+      : []),
     { label: t.console.uv, value: numberLabel(sample.uvIndex, "", 1, locale) },
     { label: t.console.aqi, value: sample.usAqi === null ? t.common.notAvailable : String(Math.round(sample.usAqi)) },
     { label: t.console.pm25, value: numberLabel(sample.pm25, "ug/m3", 1, locale) },

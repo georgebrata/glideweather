@@ -17,6 +17,7 @@ import {
   fetchCurrentSnapshot,
   fetchDayForecast,
   formatTime,
+  providerDisplayName,
   searchLocations,
   type LocationChoice,
 } from "../lib/weather";
@@ -242,6 +243,9 @@ function FlightWindowDashboard({
   const modelUpdatedLabel = currentQuery.data
     ? t.flightWindow.modelUpdated(formatTime(currentQuery.data.sample.time, currentQuery.data.timezone, locale))
     : null;
+  const providerLabel = currentQuery.data
+    ? providerDisplayName(currentQuery.data.provider)
+    : null;
 
   return (
     <main className="nocturne-canvas min-h-screen text-foreground">
@@ -310,7 +314,10 @@ function FlightWindowDashboard({
             <span className="size-1.5 rounded-full bg-primary" />
             <span>{modelUpdatedLabel ?? t.flightWindow.footerAttribution}</span>
           </div>
-          <span className="text-sm text-muted-foreground">Open-Meteo</span>
+          <span className="text-sm text-muted-foreground">
+            {providerLabel ?? "—"}
+            {currentQuery.data?.provider.fallback ? " (fallback)" : ""}
+          </span>
         </div>
       </div>
 
