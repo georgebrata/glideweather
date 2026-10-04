@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { TooltipProvider } from "@/app/components/ui/tooltip";
+import type { AppLocale } from "../i18n";
 import { getTranslations } from "../i18n";
 import { LocaleContext } from "./dashboard/LocaleContext";
 import {
@@ -12,9 +13,16 @@ import {
   readInitialThemeMode,
   subscribeLocale,
   subscribeThemeMode,
+  writeLocale,
 } from "./dashboard/themeStore";
 
-export const AppProviders = ({ children }: { children: ReactNode }) => {
+export const AppProviders = ({
+  children,
+  initialAppLocale,
+}: {
+  children: ReactNode;
+  initialAppLocale?: AppLocale;
+}) => {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -30,6 +38,12 @@ export const AppProviders = ({ children }: { children: ReactNode }) => {
   );
   const locale = useSyncExternalStore(subscribeLocale, readInitialLocale, getServerLocale);
   const t = useMemo(() => getTranslations(locale), [locale]);
+
+  useEffect(() => {
+    if (initialAppLocale) {
+      writeLocale(initialAppLocale);
+    }
+  }, [initialAppLocale]);
 
   useEffect(() => {
     const root = document.documentElement;

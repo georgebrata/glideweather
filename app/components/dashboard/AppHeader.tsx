@@ -66,6 +66,7 @@ export const AppHeader = ({
               onInputValueChange={setSearchText}
               onSelect={onSelectLocation}
               placeholder={t.flightWindow.searchPlaceholder}
+              ariaLabel={t.header.searchLabel}
               loading={searchFetching}
               loadingText={t.header.searchLoading}
               emptyText={t.header.searchEmpty}

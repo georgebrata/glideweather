@@ -71,5 +71,10 @@ export default defineConfig({
       },
       dependencies: ["setup"],
     },
+    {
+      name: "seo",
+      testMatch: /seo\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"] },
+    },
   ],
 });

@@ -1,12 +1,8 @@
-import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Inter } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
-import { authEnabled } from "../flags";
 import { MARK_SRC, PRODUCT_NAME, resolveSiteOrigin } from "./brand";
-import { LoginAnalytics } from "./components/analytics/LoginAnalytics";
-import { glideClerkAppearance } from "./lib/clerkAppearance";
-import { DEFAULT_LOCALE, getTranslations } from "./i18n";
+import { getServerDocumentLang } from "./seo/serverLocale";
 import "./globals.css";
 
 const inter = Inter({
@@ -22,33 +18,15 @@ const ibmPlexMono = IBM_Plex_Mono({
   display: "swap",
 });
 
-const defaultText = getTranslations(DEFAULT_LOCALE);
 const siteOrigin = resolveSiteOrigin();
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin),
-  title: defaultText.meta.title,
-  description: defaultText.meta.description,
   applicationName: PRODUCT_NAME,
-  alternates: {
-    canonical: "/",
-    languages: {
-      en: "/",
-      ro: "/",
-    },
-  },
   icons: {
     icon: MARK_SRC,
     shortcut: MARK_SRC,
     apple: MARK_SRC,
-  },
-  openGraph: {
-    type: "website",
-    siteName: PRODUCT_NAME,
-    url: siteOrigin,
-    title: defaultText.meta.title,
-    description: defaultText.meta.description,
-    images: [MARK_SRC],
   },
 };
 
@@ -57,24 +35,17 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const authOn = await authEnabled();
+  const lang = await getServerDocumentLang();
 
   return (
     <html
-      lang={defaultText.meta.documentLang}
+      lang={lang}
       className={`dark ${inter.variable} ${ibmPlexMono.variable}`}
       data-theme="dark"
       suppressHydrationWarning
     >
       <body className="antialiased">
-        {authOn ? (
-          <ClerkProvider appearance={glideClerkAppearance}>
-            <LoginAnalytics />
-            {children}
-          </ClerkProvider>
-        ) : (
-          children
-        )}
+        {children}
         <Analytics />
       </body>
     </html>

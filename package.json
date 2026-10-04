@@ -11,8 +11,9 @@
     "vercel-build": "next build",
     "start": "vinext start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "test": "tsx --test app/lib/weather/__tests__/evaluateFlight.test.ts app/lib/weather/__tests__/meteoblue.test.ts app/lib/weather/__tests__/service.test.ts",
+    "test": "tsx --test app/lib/weather/__tests__/evaluateFlight.test.ts app/lib/weather/__tests__/meteoblue.test.ts app/lib/weather/__tests__/service.test.ts app/seo/__tests__/seo.test.ts",
     "test:e2e": "playwright test",
+    "test:e2e:seo": "playwright test --config=playwright.seo.config.ts",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

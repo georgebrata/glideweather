@@ -49,7 +49,13 @@ export const FlightStatusPanel = ({
 
   if (loading || !snapshot) {
     return (
-      <div className="flex h-full flex-col gap-4 p-4 md:p-5">
+      <div
+        className="flex h-full flex-col gap-4 p-4 md:p-5"
+        role="status"
+        aria-live="polite"
+        aria-busy="true"
+        aria-label={t.flightWindow.flightStatus}
+      >
         <Skeleton className="h-[140px] w-full rounded-2xl" />
         <Skeleton className="h-[88px] w-full rounded-2xl" />
         <Skeleton className="h-[180px] w-full rounded-2xl" />

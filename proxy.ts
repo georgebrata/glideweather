@@ -2,6 +2,12 @@ import { clerkMiddleware } from "@clerk/nextjs/server";
 import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { authEnabled } from "./flags";
+import {
+  CONTENT_LOCALE_COOKIE,
+  CONTENT_LOCALE_HEADER,
+  contentLocaleFromPathname,
+  isClerkScopedPath,
+} from "./proxy-locale";
 
 const handleClerk = clerkMiddleware();
 
@@ -22,6 +28,14 @@ const isSamePathRewrite = (request: NextRequest, rewrite: string) => {
   }
 };
 
+const applyContentLocale = (request: NextRequest, response: Response) => {
+  const locale = contentLocaleFromPathname(request.nextUrl.pathname);
+  if (response instanceof NextResponse) {
+    response.cookies.set(CONTENT_LOCALE_COOKIE, locale, { path: "/", sameSite: "lax" });
+  }
+  return response;
+};
+
 export default async function proxy(request: NextRequest, event: NextFetchEvent) {
   const authOn = await authEnabled(request);
 
@@ -29,12 +43,46 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
     if (isAuthRoute(request.nextUrl.pathname)) {
       return NextResponse.redirect(new URL("/", request.url));
     }
-    return NextResponse.next();
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set(
+      CONTENT_LOCALE_HEADER,
+      contentLocaleFromPathname(request.nextUrl.pathname),
+    );
+    return applyContentLocale(
+      request,
+      NextResponse.next({
+        request: { headers: requestHeaders },
+      }),
+    );
+  }
+
+  if (!isClerkScopedPath(request.nextUrl.pathname)) {
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set(
+      CONTENT_LOCALE_HEADER,
+      contentLocaleFromPathname(request.nextUrl.pathname),
+    );
+    return applyContentLocale(
+      request,
+      NextResponse.next({
+        request: { headers: requestHeaders },
+      }),
+    );
   }
 
   const response = await handleClerk(request, event);
   if (!response) {
-    return NextResponse.next();
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set(
+      CONTENT_LOCALE_HEADER,
+      contentLocaleFromPathname(request.nextUrl.pathname),
+    );
+    return applyContentLocale(
+      request,
+      NextResponse.next({
+        request: { headers: requestHeaders },
+      }),
+    );
   }
   const accept = request.headers.get("accept") ?? "";
   const rewrite = response.headers.get("x-middleware-rewrite");
@@ -50,7 +98,7 @@ export default async function proxy(request: NextRequest, event: NextFetchEvent)
   if (rewrite && isReadinessProbe && isSamePathRewrite(request, rewrite)) {
     response.headers.delete("x-middleware-rewrite");
   }
-  return response;
+  return applyContentLocale(request, response);
 }
 
 export const config = {

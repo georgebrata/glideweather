@@ -3,7 +3,14 @@
 import { useUser } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import dynamic from "next/dynamic";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { destinationToLocationChoice } from "../lib/destinationLocation";
+import {
+  defaultAppLocaleForContent,
+  pathAfterLocaleChange,
+} from "../lib/localeNavigation";
+import type { ContentLocale } from "../seo/types";
 import { Alert, AlertDescription } from "@/app/components/ui/alert";
 import { Skeleton } from "@/app/components/ui/skeleton";
 import { getTranslations } from "../i18n";
@@ -26,6 +33,7 @@ import {
 import { flightTokensByMode, type ThemeMode } from "../theme/flightTokens";
 import { AppProviders } from "./AppProviders";
 import { AppHeader } from "./dashboard/AppHeader";
+import { ConsoleGuideNav } from "./dashboard/ConsoleGuideNav";
 import { ForecastDrawer } from "./dashboard/ForecastDrawer";
 const FlightMap = dynamic(
   () => import("./dashboard/FlightMap").then((module) => ({ default: module.FlightMap })),
@@ -49,26 +57,54 @@ import {
 type GlideWeatherAppProps = {
   authEnabled: boolean;
   mapboxAccessToken: string;
+  contentLocale: ContentLocale;
+  initialSiteId?: string;
 };
 
-export default function GlideWeatherApp({ authEnabled: authOn, mapboxAccessToken }: GlideWeatherAppProps) {
+export default function GlideWeatherApp({
+  authEnabled: authOn,
+  mapboxAccessToken,
+  contentLocale,
+  initialSiteId,
+}: GlideWeatherAppProps) {
+  const initialAppLocale = defaultAppLocaleForContent(contentLocale);
   return (
-    <AppProviders>
+    <AppProviders initialAppLocale={initialAppLocale}>
       {authOn ? (
-        <DashboardRootWithAuth mapboxAccessToken={mapboxAccessToken} />
+        <DashboardRootWithAuth
+          mapboxAccessToken={mapboxAccessToken}
+          contentLocale={contentLocale}
+          initialSiteId={initialSiteId}
+        />
       ) : (
-        <DashboardRootPublic mapboxAccessToken={mapboxAccessToken} />
+        <DashboardRootPublic
+          mapboxAccessToken={mapboxAccessToken}
+          contentLocale={contentLocale}
+          initialSiteId={initialSiteId}
+        />
       )}
     </AppProviders>
   );
 }
 
-function DashboardRootPublic({ mapboxAccessToken }: { mapboxAccessToken: string }) {
+type DashboardRootProps = {
+  mapboxAccessToken: string;
+  contentLocale: ContentLocale;
+  initialSiteId?: string;
+};
+
+function DashboardRootPublic({ mapboxAccessToken, contentLocale, initialSiteId }: DashboardRootProps) {
+  const pathname = usePathname();
+  const router = useRouter();
   const { locale } = useLocaleText();
   const themeMode = useSyncExternalStore(subscribeThemeMode, readInitialThemeMode, getServerThemeMode);
-  const setLocale = useCallback((nextLocale: typeof locale) => {
-    writeLocale(nextLocale);
-  }, []);
+  const setLocale = useCallback(
+    (nextLocale: typeof locale) => {
+      writeLocale(nextLocale);
+      router.push(pathAfterLocaleChange(pathname, nextLocale));
+    },
+    [pathname, router],
+  );
 
   const toggleThemeMode = useCallback(() => {
     const nextMode: ThemeMode = themeMode === "dark" ? "light" : "dark";
@@ -86,17 +122,25 @@ function DashboardRootPublic({ mapboxAccessToken }: { mapboxAccessToken: string 
       themeMode={themeMode}
       toggleThemeMode={toggleThemeMode}
       mapboxAccessToken={mapboxAccessToken}
+      contentLocale={contentLocale}
+      initialSiteId={initialSiteId}
     />
   );
 }
 
-function DashboardRootWithAuth({ mapboxAccessToken }: { mapboxAccessToken: string }) {
+function DashboardRootWithAuth({ mapboxAccessToken, contentLocale, initialSiteId }: DashboardRootProps) {
+  const pathname = usePathname();
+  const router = useRouter();
   const { locale } = useLocaleText();
   const { isLoaded: authLoaded, isSignedIn, user } = useUser();
   const themeMode = useSyncExternalStore(subscribeThemeMode, readInitialThemeMode, getServerThemeMode);
-  const setLocale = useCallback((nextLocale: typeof locale) => {
-    writeLocale(nextLocale);
-  }, []);
+  const setLocale = useCallback(
+    (nextLocale: typeof locale) => {
+      writeLocale(nextLocale);
+      router.push(pathAfterLocaleChange(pathname, nextLocale));
+    },
+    [pathname, router],
+  );
 
   const toggleThemeMode = useCallback(() => {
     const nextMode: ThemeMode = themeMode === "dark" ? "light" : "dark";
@@ -117,6 +161,8 @@ function DashboardRootWithAuth({ mapboxAccessToken }: { mapboxAccessToken: strin
       themeMode={themeMode}
       toggleThemeMode={toggleThemeMode}
       mapboxAccessToken={mapboxAccessToken}
+      contentLocale={contentLocale}
+      initialSiteId={initialSiteId}
     />
   );
 }
@@ -131,6 +177,8 @@ function FlightWindowDashboard({
   themeMode,
   toggleThemeMode,
   mapboxAccessToken,
+  contentLocale,
+  initialSiteId,
 }: {
   authEnabled: boolean;
   authLoaded: boolean;
@@ -141,6 +189,8 @@ function FlightWindowDashboard({
   themeMode: ThemeMode;
   toggleThemeMode: () => void;
   mapboxAccessToken: string;
+  contentLocale: ContentLocale;
+  initialSiteId?: string;
 }) {
   const { t } = useLocaleText();
   const tokens = flightTokensByMode[themeMode];
@@ -154,6 +204,7 @@ function FlightWindowDashboard({
   const [initialLocationReady, setInitialLocationReady] = useState(false);
   const localeRef = useRef(locale);
   const preferencesAppliedRef = useRef(false);
+  const siteBootstrapRef = useRef(false);
 
   useEffect(() => {
     localeRef.current = locale;
@@ -196,8 +247,20 @@ function FlightWindowDashboard({
 
   /* eslint-disable react-hooks/set-state-in-effect -- bootstrap dashboard location from Clerk metadata or GPS once */
   useEffect(() => {
-    if (!authLoaded || initialLocationReady) {
+    if (!authLoaded || initialLocationReady || siteBootstrapRef.current) {
       return;
+    }
+
+    if (initialSiteId) {
+      const fromSite = destinationToLocationChoice(initialSiteId, contentLocale);
+      if (fromSite) {
+        siteBootstrapRef.current = true;
+        setLocation(fromSite);
+        setLocationNotice(null);
+        setLocating(false);
+        setInitialLocationReady(true);
+        return;
+      }
     }
 
     if (isSignedIn && user) {
@@ -227,7 +290,15 @@ function FlightWindowDashboard({
       requestLocation();
       setInitialLocationReady(true);
     }
-  }, [authLoaded, initialLocationReady, isSignedIn, requestLocation, user]);
+  }, [
+    authLoaded,
+    contentLocale,
+    initialLocationReady,
+    initialSiteId,
+    isSignedIn,
+    requestLocation,
+    user,
+  ]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const currentQuery = useQuery({
@@ -281,8 +352,26 @@ function FlightWindowDashboard({
     ? providerDisplayName(currentQuery.data.provider)
     : null;
 
+  const verdictAnnouncement = useMemo(() => {
+    if (!currentQuery.data) return "";
+    const verdict = currentQuery.data.verdict;
+    return `${t.common.scoreOutOf100(verdict.score)}. ${verdict.reasons[0] ?? t.decision.noCriticalReasons}`;
+  }, [currentQuery.data, t]);
+
+  const attributionFallback =
+    providerLabel != null
+      ? `${t.header.productChip} · ${providerLabel} · ${
+          contentLocale === "ro"
+            ? "Ajutor la decizie, nu autorizare de zbor."
+            : "Decision aid, not flight authorization."
+        }`
+      : t.flightWindow.footerAttribution;
+
   return (
-    <main className="nocturne-canvas min-h-screen text-foreground">
+    <main id="main-content" className="nocturne-canvas min-h-screen text-foreground">
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {verdictAnnouncement}
+      </div>
       <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 md:px-6 md:py-8">
         <AppHeader
           authEnabled={authEnabled}
@@ -298,6 +387,8 @@ function FlightWindowDashboard({
           themeMode={themeMode}
           toggleThemeMode={toggleThemeMode}
         />
+
+        <ConsoleGuideNav contentLocale={contentLocale} />
 
         {locationNotice ? (
           <Alert variant="default" className="border-[var(--border-flight)] bg-card">
@@ -344,10 +435,12 @@ function FlightWindowDashboard({
           </div>
         </div>
 
+        <p className="text-sm text-muted-foreground">{t.decision.disclaimer}</p>
+
         <div className="flex flex-col justify-between gap-2 pt-1 sm:flex-row sm:items-center">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span className="size-1.5 rounded-full bg-primary" />
-            <span>{modelUpdatedLabel ?? t.flightWindow.footerAttribution}</span>
+            <span>{modelUpdatedLabel ?? attributionFallback}</span>
           </div>
           <span className="text-sm text-muted-foreground">
             {providerLabel ?? "—"}
