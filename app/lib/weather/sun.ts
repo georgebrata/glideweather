@@ -58,10 +58,12 @@ export function astronomicalSunriseSunset(
   const sunriseUtc = solarNoonUtc - ha / 15;
   const sunsetUtc = solarNoonUtc + ha / 15;
 
-  const sunriseHour = Math.floor(sunriseUtc);
-  const sunriseMin = Math.round((sunriseUtc - sunriseHour) * 60);
-  const sunsetHour = Math.floor(sunsetUtc);
-  const sunsetMin = Math.round((sunsetUtc - sunsetHour) * 60);
+  const sunriseTotal = Math.round(sunriseUtc * 60);
+  const sunsetTotal = Math.round(sunsetUtc * 60);
+  const sunriseHour = Math.floor(sunriseTotal / 60);
+  const sunriseMin = ((sunriseTotal % 60) + 60) % 60;
+  const sunsetHour = Math.floor(sunsetTotal / 60);
+  const sunsetMin = ((sunsetTotal % 60) + 60) % 60;
 
   return {
     sunrise: formatLocalTime(date, ((sunriseHour % 24) + 24) % 24, sunriseMin, timezone),
