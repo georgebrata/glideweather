@@ -4,9 +4,13 @@ import type { LocationChoice } from "../../lib/weather/domain";
 import { getCurrentSnapshot, getDayForecast } from "../../lib/weather/service";
 
 function parseLocation(request: NextRequest): LocationChoice | null {
-  const lat = Number(request.nextUrl.searchParams.get("lat"));
-  const lon = Number(request.nextUrl.searchParams.get("lon"));
+  const latRaw = request.nextUrl.searchParams.get("lat")?.trim();
+  const lonRaw = request.nextUrl.searchParams.get("lon")?.trim();
+  if (!latRaw || !lonRaw) return null;
+  const lat = Number(latRaw);
+  const lon = Number(lonRaw);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
 
   return {
     id: request.nextUrl.searchParams.get("id") ?? "api",
