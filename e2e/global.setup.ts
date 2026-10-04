@@ -27,11 +27,28 @@ setup("authenticate profile user", async ({ page }) => {
   mkdirSync(path.dirname(statePath), { recursive: true });
 
   await openWithTestingToken(page, "/");
-  await clerk.signIn({
-    page,
-    emailAddress: profileUserEmail,
-  });
-  await page.goto("/profile");
+  await page.getByRole("button", { name: "Sign in" }).waitFor();
+  try {
+    await clerk.signIn({
+      page,
+      emailAddress: profileUserEmail,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (!message.includes("Execution context was destroyed")) {
+      throw error;
+    }
+  }
+  await page.locator(".cl-userButtonTrigger").waitFor();
+  try {
+    await page.goto("/profile");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (!message.includes("ERR_ABORTED")) {
+      throw error;
+    }
+    await page.goto("/profile");
+  }
   await page.getByRole("heading", { name: "Your profile" }).waitFor();
   await page.context().storageState({ path: statePath });
 });

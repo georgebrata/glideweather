@@ -20,6 +20,7 @@ const baseURL = `http://localhost:${port}`;
 const webServerEnv = Object.fromEntries(
   Object.entries(process.env).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
 );
+webServerEnv.E2E_AUTH_TOGGLE = "1";
 
 export default defineConfig({
   testDir: "./e2e",

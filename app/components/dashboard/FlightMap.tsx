@@ -1,11 +1,12 @@
 "use client";
 
 import { ChevronRight, MapPin, Mountain, Wind } from "lucide-react";
-import * as maplibregl from "maplibre-gl";
-import type { GeoJSONSource, Map as MapLibreMap, Marker } from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
+import * as mapboxgl from "mapbox-gl/esm";
+import type { GeoJSONSource, Map as MapboxMap, Marker } from "mapbox-gl/esm";
+import "mapbox-gl/dist/mapbox-gl.css";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/app/components/ui/button";
+import { applyBasemapTheme, basemapConfigForTheme } from "@/app/lib/mapboxBasemap";
 import { cn } from "@/app/lib/utils";
 import { formatCoordinateOverlay, locationFromCoordinates, reverseGeocode } from "../../lib/location";
 import { fetchWindGrid, type WindGridPoint } from "../../lib/windGrid";
@@ -14,6 +15,21 @@ import { flightTokensByMode, type ThemeMode } from "../../theme/flightTokens";
 import { useLocaleText } from "./LocaleContext";
 
 type MapMode = "wind" | "terrain";
+
+function windGridCacheKey(latitude: number, longitude: number) {
+  const lat = Math.round(latitude * 1000) / 1000;
+  const lon = Math.round(longitude * 1000) / 1000;
+  return `${lat}:${lon}`;
+}
+
+function centerDistanceDegrees(
+  a: { latitude: number; longitude: number },
+  b: { latitude: number; longitude: number },
+) {
+  const dLat = a.latitude - b.latitude;
+  const dLon = a.longitude - b.longitude;
+  return Math.hypot(dLat, dLon);
+}
 
 function circleRing(lng: number, lat: number, radiusKm: number, points = 64): [number, number][] {
   const coords: [number, number][] = [];
@@ -69,12 +85,34 @@ function windBarbsGeoJson(points: WindGridPoint[]) {
   };
 }
 
+function createPinElement(accent: string) {
+  const root = document.createElement("div");
+  root.setAttribute("aria-hidden", "true");
+  root.style.width = "22px";
+  root.style.height = "22px";
+  root.style.borderRadius = "50%";
+  root.style.border = `2px solid ${accent}`;
+  root.style.background = "rgba(7, 20, 16, 0.88)";
+  root.style.boxShadow = `0 0 14px ${accent}, 0 0 28px ${accent}66`;
+  root.style.cursor = "grab";
+  const core = document.createElement("div");
+  core.style.width = "8px";
+  core.style.height = "8px";
+  core.style.margin = "5px auto 0";
+  core.style.borderRadius = "50%";
+  core.style.background = accent;
+  root.appendChild(core);
+  return root;
+}
+
 export const FlightMap = ({
+  accessToken,
   location,
   themeMode,
   onLocationChange,
   onOpenSites,
 }: {
+  accessToken: string;
   location: LocationChoice | null;
   themeMode: ThemeMode;
   onLocationChange: (location: LocationChoice) => void;
@@ -83,141 +121,241 @@ export const FlightMap = ({
   const { locale, t } = useLocaleText();
   const tokens = flightTokensByMode[themeMode];
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<MapLibreMap | null>(null);
+  const mapRef = useRef<MapboxMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
   const [mapMode, setMapMode] = useState<MapMode>("wind");
-  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mapModeRef = useRef<MapMode>("wind");
+  const pinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const windGridCacheRef = useRef<Map<string, WindGridPoint[]>>(new Map());
+  const windFetchGenRef = useRef(0);
+  const lastCameraRef = useRef<{ latitude: number; longitude: number } | null>(null);
+  const themeModeRef = useRef(themeMode);
+  const accentRef = useRef(tokens.accent);
+  const handlePinMoveRef = useRef<(latitude: number, longitude: number) => void>(() => undefined);
 
-  const settleLocation = useCallback(
+  const updateRings = useCallback((lng: number, lat: number) => {
+    const map = mapRef.current;
+    const source = map?.getSource("radar-rings") as GeoJSONSource | undefined;
+    source?.setData(ringsGeoJson(lng, lat));
+  }, []);
+
+  const applyWindGridToMap = useCallback((grid: WindGridPoint[]) => {
+    const map = mapRef.current;
+    const source = map?.getSource("wind-barbs") as GeoJSONSource | undefined;
+    source?.setData(windBarbsGeoJson(grid));
+  }, []);
+
+  const loadWindGrid = useCallback(
+    async (latitude: number, longitude: number) => {
+      if (mapModeRef.current !== "wind") return;
+
+      const key = windGridCacheKey(latitude, longitude);
+      const cached = windGridCacheRef.current.get(key);
+      if (cached) {
+        applyWindGridToMap(cached);
+        return;
+      }
+
+      const generation = windFetchGenRef.current + 1;
+      windFetchGenRef.current = generation;
+      const grid = await fetchWindGrid(latitude, longitude);
+      if (windFetchGenRef.current !== generation) return;
+
+      windGridCacheRef.current.set(key, grid);
+      applyWindGridToMap(grid);
+    },
+    [applyWindGridToMap],
+  );
+
+  const moveCameraTo = useCallback((latitude: number, longitude: number) => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const previous = lastCameraRef.current;
+    lastCameraRef.current = { latitude, longitude };
+
+    const camera = {
+      center: [longitude, latitude] as [number, number],
+      zoom: 12.5,
+      pitch: 48,
+      bearing: 0,
+    };
+
+    if (previous && centerDistanceDegrees(previous, { latitude, longitude }) > 0.45) {
+      map.jumpTo(camera);
+    } else {
+      map.easeTo({ ...camera, duration: 600 });
+    }
+  }, []);
+
+  const syncExternalLocation = useCallback(
     (latitude: number, longitude: number) => {
-      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
-      settleTimerRef.current = setTimeout(async () => {
+      const map = mapRef.current;
+      if (!map) return;
+
+      markerRef.current?.setLngLat([longitude, latitude]);
+      moveCameraTo(latitude, longitude);
+
+      const applyOverlays = () => {
+        updateRings(longitude, latitude);
+        void loadWindGrid(latitude, longitude);
+      };
+
+      if (map.isStyleLoaded()) {
+        applyOverlays();
+      } else {
+        map.once("style.load", applyOverlays);
+      }
+    },
+    [loadWindGrid, moveCameraTo, updateRings],
+  );
+
+  const resolvePinLocation = useCallback(
+    (latitude: number, longitude: number) => {
+      if (pinTimerRef.current) clearTimeout(pinTimerRef.current);
+      pinTimerRef.current = setTimeout(async () => {
         const reversed = await reverseGeocode(latitude, longitude, locale);
         onLocationChange(reversed ?? locationFromCoordinates(latitude, longitude, locale));
-        const grid = await fetchWindGrid(latitude, longitude);
-        const map = mapRef.current;
-        if (map?.getSource("wind-barbs")) {
-          (map.getSource("wind-barbs") as GeoJSONSource).setData(windBarbsGeoJson(grid));
-        }
       }, 450);
     },
     [locale, onLocationChange],
   );
 
+  const handlePinMove = useCallback(
+    (latitude: number, longitude: number) => {
+      updateRings(longitude, latitude);
+      void loadWindGrid(latitude, longitude);
+      resolvePinLocation(latitude, longitude);
+    },
+    [loadWindGrid, resolvePinLocation, updateRings],
+  );
+
+  useEffect(() => {
+    mapModeRef.current = mapMode;
+    themeModeRef.current = themeMode;
+    accentRef.current = tokens.accent;
+    handlePinMoveRef.current = handlePinMove;
+  }, [handlePinMove, mapMode, themeMode, tokens.accent]);
+
   const coordinateLabel = location
     ? formatCoordinateOverlay(location.latitude, location.longitude)
     : "";
 
-  const applyThemeToMap = useCallback(
-    (map: MapLibreMap) => {
-      map.getCanvas().style.filter = themeMode === "dark" ? "saturate(0.75) brightness(0.72)" : "saturate(0.85)";
-    },
-    [themeMode],
-  );
-
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return undefined;
+    if (!accessToken || !containerRef.current || mapRef.current) return undefined;
 
-    const map = new maplibregl.Map({
+    const initialLng = location?.longitude ?? 25.6;
+    const initialLat = location?.latitude ?? 45.6;
+    lastCameraRef.current = { latitude: initialLat, longitude: initialLng };
+
+    const map = new mapboxgl.Map({
+      accessToken,
       container: containerRef.current,
-      style: "https://tiles.openfreemap.org/styles/liberty",
-      center: [location?.longitude ?? 25.6, location?.latitude ?? 45.6],
-      zoom: 12,
+      style: "mapbox://styles/mapbox/standard",
+      config: {
+        basemap: basemapConfigForTheme(themeModeRef.current),
+      },
+      center: [initialLng, initialLat],
+      zoom: 12.5,
+      pitch: 48,
+      bearing: 0,
+      projection: "mercator",
+      refreshExpiredTiles: false,
       attributionControl: false,
     });
 
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
-    map.addControl(new maplibregl.ScaleControl({ maxWidth: 80, unit: "metric" }), "top-right");
+    map.addControl(new mapboxgl.AttributionControl({ compact: true }), "bottom-right");
+    map.addControl(new mapboxgl.ScaleControl({ maxWidth: 80, unit: "metric" }), "top-right");
 
-    map.on("load", () => {
-      applyThemeToMap(map);
+    const addOverlays = () => {
+      applyBasemapTheme(map, themeModeRef.current);
 
-      map.addSource("radar-rings", {
-        type: "geojson",
-        data: ringsGeoJson(location?.longitude ?? 25.6, location?.latitude ?? 45.6),
-      });
-      map.addLayer({
-        id: "radar-rings-line",
-        type: "line",
-        source: "radar-rings",
-        paint: {
-          "line-color": tokens.accent,
-          "line-opacity": 0.22,
-          "line-width": 1,
-        },
-      });
-
-      map.addSource("wind-barbs", {
-        type: "geojson",
-        data: windBarbsGeoJson([]),
-      });
-      map.addLayer({
-        id: "wind-barbs-line",
-        type: "line",
-        source: "wind-barbs",
-        paint: {
-          "line-color": tokens.accent,
-          "line-opacity": 0.75,
-          "line-width": 2,
-        },
-      });
-
-      if (location) {
-        settleLocation(location.latitude, location.longitude);
+      if (!map.getSource("radar-rings")) {
+        map.addSource("radar-rings", {
+          type: "geojson",
+          data: ringsGeoJson(initialLng, initialLat),
+        });
+        map.addLayer({
+          id: "radar-rings-line",
+          type: "line",
+          source: "radar-rings",
+          slot: "top",
+          paint: {
+            "line-color": accentRef.current,
+            "line-opacity": 0.22,
+            "line-width": 1,
+          },
+        });
       }
-    });
+
+      if (!map.getSource("wind-barbs")) {
+        map.addSource("wind-barbs", {
+          type: "geojson",
+          data: windBarbsGeoJson([]),
+        });
+        map.addLayer({
+          id: "wind-barbs-line",
+          type: "line",
+          source: "wind-barbs",
+          slot: "top",
+          paint: {
+            "line-color": accentRef.current,
+            "line-opacity": 0.75,
+            "line-width": 2,
+          },
+        });
+      }
+    };
+
+    map.on("style.load", addOverlays);
+    if (map.isStyleLoaded()) addOverlays();
 
     map.on("click", (event) => {
       const { lng, lat } = event.lngLat;
       markerRef.current?.setLngLat([lng, lat]);
-      (map.getSource("radar-rings") as GeoJSONSource)?.setData(ringsGeoJson(lng, lat));
-      settleLocation(lat, lng);
+      handlePinMoveRef.current(lat, lng);
     });
 
-    const marker = new maplibregl.Marker({
-      color: tokens.accent,
+    const marker = new mapboxgl.Marker({
+      element: createPinElement(accentRef.current),
       draggable: true,
     })
-      .setLngLat([location?.longitude ?? 25.6, location?.latitude ?? 45.6])
+      .setLngLat([initialLng, initialLat])
       .addTo(map);
 
     marker.on("dragend", () => {
       const lngLat = marker.getLngLat();
-      (map.getSource("radar-rings") as GeoJSONSource)?.setData(
-        ringsGeoJson(lngLat.lng, lngLat.lat),
-      );
-      settleLocation(lngLat.lat, lngLat.lng);
+      handlePinMoveRef.current(lngLat.lat, lngLat.lng);
     });
 
     mapRef.current = map;
     markerRef.current = marker;
 
+    if (location) {
+      void loadWindGrid(location.latitude, location.longitude);
+    }
+
     return () => {
+      if (pinTimerRef.current) clearTimeout(pinTimerRef.current);
       marker.remove();
       map.remove();
       mapRef.current = null;
       markerRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- map mounts once
-  }, []);
+  }, [accessToken]);
 
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !location) return;
-    markerRef.current?.setLngLat([location.longitude, location.latitude]);
-    map.easeTo({ center: [location.longitude, location.latitude], duration: 600 });
-    if (map.getSource("radar-rings")) {
-      (map.getSource("radar-rings") as GeoJSONSource).setData(
-        ringsGeoJson(location.longitude, location.latitude),
-      );
-    }
-    settleLocation(location.latitude, location.longitude);
-  }, [location?.id, location?.latitude, location?.longitude, settleLocation]);
+    if (!location) return;
+    syncExternalLocation(location.latitude, location.longitude);
+  }, [location?.id, location?.latitude, location?.longitude, syncExternalLocation]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    applyThemeToMap(map);
+
+    applyBasemapTheme(map, themeMode);
+
     if (map.getLayer("wind-barbs-line")) {
       map.setPaintProperty("wind-barbs-line", "line-color", tokens.accent);
       map.setPaintProperty("wind-barbs-line", "line-opacity", mapMode === "wind" ? 0.75 : 0.2);
@@ -225,22 +363,42 @@ export const FlightMap = ({
     if (map.getLayer("radar-rings-line")) {
       map.setPaintProperty("radar-rings-line", "line-color", tokens.accent);
     }
-  }, [applyThemeToMap, mapMode, themeMode, tokens.accent]);
+  }, [mapMode, themeMode, tokens.accent]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
-    if (mapMode === "terrain" && !map.getSource("terrain-dem")) {
-      map.addSource("terrain-dem", {
-        type: "raster-dem",
-        url: "https://demotiles.maplibre.org/terrain-tiles/tiles.json",
-        tileSize: 256,
-      });
+
+    if (mapMode === "terrain") {
+      if (!map.getSource("terrain-dem")) {
+        map.addSource("terrain-dem", {
+          type: "raster-dem",
+          url: "mapbox://mapbox.mapbox-terrain-dem-v1",
+          tileSize: 512,
+          maxzoom: 14,
+        });
+      }
       map.setTerrain({ source: "terrain-dem", exaggeration: 1.15 });
-    } else if (mapMode === "wind") {
+    } else {
       map.setTerrain(null);
+      if (location) {
+        void loadWindGrid(location.latitude, location.longitude);
+      }
     }
-  }, [mapMode]);
+  }, [loadWindGrid, location?.latitude, location?.longitude, mapMode]);
+
+  if (!accessToken) {
+    return (
+      <div
+        className="relative flex h-full min-h-[320px] flex-col items-center justify-center gap-2 border border-[var(--border-flight)] bg-card p-6 text-center md:min-h-[520px]"
+        style={{ borderRadius: tokens.innerRadius }}
+      >
+        <p className="text-sm text-muted-foreground">
+          Map unavailable: set MAPBOX_PERSONAL_ACCESS_TOKEN in the environment.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div

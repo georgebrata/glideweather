@@ -2,6 +2,7 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Alert, AlertDescription } from "@/app/components/ui/alert";
 import { Skeleton } from "@/app/components/ui/skeleton";
@@ -12,11 +13,13 @@ import {
   storedLocationToChoice,
   updateUserPreferences,
 } from "../lib/userPreferences";
+import { trackSearch } from "../lib/analytics";
 import {
   dateForOffset,
   fetchCurrentSnapshot,
   fetchDayForecast,
   formatTime,
+  providerDisplayName,
   searchLocations,
   type LocationChoice,
 } from "../lib/weather";
@@ -24,7 +27,13 @@ import { flightTokensByMode, type ThemeMode } from "../theme/flightTokens";
 import { AppProviders } from "./AppProviders";
 import { AppHeader } from "./dashboard/AppHeader";
 import { ForecastDrawer } from "./dashboard/ForecastDrawer";
-import { FlightMap } from "./dashboard/FlightMap";
+const FlightMap = dynamic(
+  () => import("./dashboard/FlightMap").then((module) => ({ default: module.FlightMap })),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-[420px] w-full rounded-none" />,
+  },
+);
 import { FlightStatusPanel } from "./dashboard/FlightStatusPanel";
 import { useLocaleText } from "./dashboard/LocaleContext";
 import { SitesDrawer } from "./dashboard/SitesDrawer";
@@ -39,17 +48,22 @@ import {
 
 type GlideWeatherAppProps = {
   authEnabled: boolean;
+  mapboxAccessToken: string;
 };
 
-export default function GlideWeatherApp({ authEnabled: authOn }: GlideWeatherAppProps) {
+export default function GlideWeatherApp({ authEnabled: authOn, mapboxAccessToken }: GlideWeatherAppProps) {
   return (
     <AppProviders>
-      {authOn ? <DashboardRootWithAuth /> : <DashboardRootPublic />}
+      {authOn ? (
+        <DashboardRootWithAuth mapboxAccessToken={mapboxAccessToken} />
+      ) : (
+        <DashboardRootPublic mapboxAccessToken={mapboxAccessToken} />
+      )}
     </AppProviders>
   );
 }
 
-function DashboardRootPublic() {
+function DashboardRootPublic({ mapboxAccessToken }: { mapboxAccessToken: string }) {
   const { locale } = useLocaleText();
   const themeMode = useSyncExternalStore(subscribeThemeMode, readInitialThemeMode, getServerThemeMode);
   const setLocale = useCallback((nextLocale: typeof locale) => {
@@ -71,11 +85,12 @@ function DashboardRootPublic() {
       setLocale={setLocale}
       themeMode={themeMode}
       toggleThemeMode={toggleThemeMode}
+      mapboxAccessToken={mapboxAccessToken}
     />
   );
 }
 
-function DashboardRootWithAuth() {
+function DashboardRootWithAuth({ mapboxAccessToken }: { mapboxAccessToken: string }) {
   const { locale } = useLocaleText();
   const { isLoaded: authLoaded, isSignedIn, user } = useUser();
   const themeMode = useSyncExternalStore(subscribeThemeMode, readInitialThemeMode, getServerThemeMode);
@@ -101,6 +116,7 @@ function DashboardRootWithAuth() {
       setLocale={setLocale}
       themeMode={themeMode}
       toggleThemeMode={toggleThemeMode}
+      mapboxAccessToken={mapboxAccessToken}
     />
   );
 }
@@ -114,6 +130,7 @@ function FlightWindowDashboard({
   setLocale,
   themeMode,
   toggleThemeMode,
+  mapboxAccessToken,
 }: {
   authEnabled: boolean;
   authLoaded: boolean;
@@ -123,6 +140,7 @@ function FlightWindowDashboard({
   setLocale: (locale: ReturnType<typeof readInitialLocale>) => void;
   themeMode: ThemeMode;
   toggleThemeMode: () => void;
+  mapboxAccessToken: string;
 }) {
   const { t } = useLocaleText();
   const tokens = flightTokensByMode[themeMode];
@@ -164,6 +182,7 @@ function FlightWindowDashboard({
         setLocationNotice(null);
         setActiveTab(0);
         setLocating(false);
+        trackSearch("browser");
       },
       () => {
         setLocationNotice("denied");
@@ -239,8 +258,27 @@ function FlightWindowDashboard({
     setSearchText("");
   }, []);
 
+  const selectLocationFromSearch = useCallback(
+    (next: LocationChoice) => {
+      trackSearch("result");
+      selectLocation(next);
+    },
+    [selectLocation],
+  );
+
+  const selectLocationFromMap = useCallback(
+    (next: LocationChoice) => {
+      trackSearch("map");
+      selectLocation(next);
+    },
+    [selectLocation],
+  );
+
   const modelUpdatedLabel = currentQuery.data
     ? t.flightWindow.modelUpdated(formatTime(currentQuery.data.sample.time, currentQuery.data.timezone, locale))
+    : null;
+  const providerLabel = currentQuery.data
+    ? providerDisplayName(currentQuery.data.provider)
     : null;
 
   return (
@@ -250,7 +288,7 @@ function FlightWindowDashboard({
           authEnabled={authEnabled}
           locating={locating}
           onRequestLocation={requestLocation}
-          onSelectLocation={selectLocation}
+          onSelectLocation={selectLocationFromSearch}
           searchData={searchQuery.data ?? []}
           searchFetching={searchQuery.isFetching}
           searchText={searchText}
@@ -287,9 +325,10 @@ function FlightWindowDashboard({
               <Skeleton className="h-[420px] w-full rounded-none" />
             ) : (
               <FlightMap
+                accessToken={mapboxAccessToken}
                 location={location}
                 themeMode={themeMode}
-                onLocationChange={selectLocation}
+                onLocationChange={selectLocationFromMap}
                 onOpenSites={() => setSitesOpen(true)}
               />
             )}
@@ -310,7 +349,10 @@ function FlightWindowDashboard({
             <span className="size-1.5 rounded-full bg-primary" />
             <span>{modelUpdatedLabel ?? t.flightWindow.footerAttribution}</span>
           </div>
-          <span className="text-sm text-muted-foreground">Open-Meteo</span>
+          <span className="text-sm text-muted-foreground">
+            {providerLabel ?? "—"}
+            {currentQuery.data?.provider.fallback ? " (fallback)" : ""}
+          </span>
         </div>
       </div>
 

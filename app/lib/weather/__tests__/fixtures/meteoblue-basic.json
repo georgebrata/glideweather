@@ -1,0 +1,53 @@
+{
+  "metadata": {
+    "latitude": 45.6,
+    "longitude": 25.6,
+    "height": 1200,
+    "timezone": "Europe/Bucharest",
+    "modelrun_utc": "2026-10-03 06:00"
+  },
+  "units": {
+    "visibility": "km",
+    "windspeed": "km/h"
+  },
+  "data_1h": {
+    "time": [
+      "2026-10-03T10:00",
+      "2026-10-03T11:00",
+      "2026-10-03T12:00"
+    ],
+    "temperature": [18, 19, 20],
+    "felttemperature": [17, 18, 19],
+    "relativehumidity": [55, 50, 48],
+    "precipitation": [0, 0.1, 0],
+    "precipitation_probability": [10, 15, 20],
+    "pictocode": [2, 3, 4],
+    "windspeed": [12, 14, 16],
+    "winddirection": [90, 95, 100],
+    "sealevelpressure": [1015, 1014, 1013],
+    "uvindex": [3, 4, 5]
+  },
+  "data_3h": {
+    "time": ["2026-10-03T09:00", "2026-10-03T12:00"],
+    "gust": [20, 24],
+    "surfaceairpressure": [900, 898],
+    "lowclouds": [10, 30],
+    "midclouds": [20, 25],
+    "highclouds": [5, 10],
+    "totalcloudcover": [35, 55],
+    "visibility": [15, 12],
+    "cape": [400, 900],
+    "liftedindex": [2, -3],
+    "pblheight": [800, 1200],
+    "windspeed_80m": [18, 32],
+    "winddirection_80m": [85, 90]
+  },
+  "data_day": {
+    "time": ["2026-10-03"],
+    "temperature_max": [22],
+    "temperature_min": [12],
+    "precipitation": [1.2],
+    "precipitation_probability": [40],
+    "predictability": [25]
+  }
+}
