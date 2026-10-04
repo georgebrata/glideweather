@@ -1,15 +1,28 @@
 import { PRODUCT_NAME, resolveSiteOrigin } from "../brand";
-import { pathForRoute } from "./routes";
+import { documentLang } from "./locale";
+import { getRoute, pathForRoute } from "./routes";
 import type { ContentLocale } from "./types";
 
 const origin = resolveSiteOrigin();
 
-export function JsonLd({ data }: { data: Record<string, unknown> | Record<string, unknown>[] }) {
-  const payload = Array.isArray(data) ? data : [data];
+type JsonLdNode = Record<string, unknown>;
+
+/** One JSON-LD object. A top-level array has no `@context`, which crashes Safari's parser. */
+export function jsonLdDocument(data: JsonLdNode | JsonLdNode[]): JsonLdNode {
+  const nodes = Array.isArray(data) ? data : [data];
+  if (nodes.length === 1) return nodes[0];
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": nodes,
+  };
+}
+
+export function JsonLd({ data }: { data: JsonLdNode | JsonLdNode[] }) {
   return (
     <script
       type="application/ld+json"
-      dangerouslySetInnerHTML={{ __html: JSON.stringify(payload.length === 1 ? payload[0] : payload) }}
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdDocument(data)) }}
     />
   );
 }
@@ -33,7 +46,7 @@ export function webSiteJsonLd(locale: ContentLocale) {
     name: PRODUCT_NAME,
     url: origin,
     publisher: { "@id": `${origin}/#organization` },
-    inLanguage: locale === "ro" ? "ro" : "en",
+    inLanguage: documentLang(locale),
   };
 }
 
@@ -51,7 +64,7 @@ export function webPageJsonLd(
     name,
     description,
     isPartOf: { "@id": `${origin}/#website` },
-    inLanguage: locale === "ro" ? "ro" : "en",
+    inLanguage: documentLang(locale),
   };
 }
 
@@ -88,7 +101,7 @@ export function faqPageJsonLd(
         text: faq.answer,
       },
     })),
-    inLanguage: locale === "ro" ? "ro" : "en",
+    inLanguage: documentLang(locale),
   };
 }
 
@@ -117,27 +130,16 @@ export function placeJsonLd(
       addressCountry,
     },
     url: `${origin}${path}`,
-    inLanguage: locale === "ro" ? "ro" : "en",
+    inLanguage: documentLang(locale),
   };
 }
 
 export function homeJsonLd(locale: ContentLocale) {
+  const route = getRoute("home");
   const path = pathForRoute("home", locale);
-  const name =
-    locale === "ro"
-      ? "GlideWeather · Fereastra de zbor parapantă"
-      : "GlideWeather · Paragliding flight window";
-  const description =
-    locale === "ro"
-      ? getRouteDescriptionRo()
-      : getRouteDescriptionEn();
-  return [organizationJsonLd(), webSiteJsonLd(locale), webPageJsonLd(locale, path, name, description)];
-}
-
-function getRouteDescriptionEn() {
-  return "Hyperlocal paragliding weather with flight confidence scoring and launch-window guidance.";
-}
-
-function getRouteDescriptionRo() {
-  return "Meteo hiperlocală pentru parapantă cu scor de încredere și ghidaj pentru fereastra de zbor.";
+  return [
+    organizationJsonLd(),
+    webSiteJsonLd(locale),
+    webPageJsonLd(locale, path, route.titles[locale], route.descriptions[locale]),
+  ];
 }

@@ -2,11 +2,26 @@
 
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import { LogIn, UserCircle, UserPlus } from "lucide-react";
+import { useMemo, useSyncExternalStore } from "react";
 import { Button } from "@/app/components/ui/button";
+import { glideClerkAppearance } from "@/app/lib/clerkAppearance";
+import { getServerThemeMode, readInitialThemeMode, subscribeThemeMode } from "./themeStore";
 import { useLocaleText } from "./LocaleContext";
 
 export const AuthControls = () => {
   const { t } = useLocaleText();
+  const themeMode = useSyncExternalStore(subscribeThemeMode, readInitialThemeMode, getServerThemeMode);
+  const userButtonAppearance = useMemo(() => {
+    const appearance = glideClerkAppearance(themeMode);
+    return {
+      ...appearance,
+      elements: {
+        ...appearance.elements,
+        avatarBox: { width: 44, height: 44 },
+        userButtonAvatarBox: { width: 44, height: 44 },
+      },
+    };
+  }, [themeMode]);
 
   return (
     <div className="flex shrink-0 items-center gap-2">

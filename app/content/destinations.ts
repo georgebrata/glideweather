@@ -1,4 +1,6 @@
-import type { ContentLocale } from "../seo/types";
+import { contentLocaleDefinition, localeHomePath, type ContentLocale, type CopyLocale } from "../../content-locales";
+import { destinationDirectory } from "../seo/routes";
+import { COUNTRY_DESTINATIONS } from "./countryDestinations";
 
 export type DestinationRegion =
   | "europe"
@@ -9,6 +11,12 @@ export type DestinationRegion =
   | "southAmerica"
   | "romania";
 
+export type LocalizedText = Partial<Record<CopyLocale, string>> & { en: string };
+
+export function localizedText(text: LocalizedText, locale: ContentLocale): string {
+  return text[contentLocaleDefinition(locale).copy] ?? text.en;
+}
+
 export type DestinationRecord = {
   id: string;
   slug: string;
@@ -16,12 +24,12 @@ export type DestinationRecord = {
   countryCode: string;
   latitude: number;
   longitude: number;
-  names: Record<ContentLocale, string>;
-  areas: Record<ContentLocale, string>;
-  shortDescriptions: Record<ContentLocale, string>;
-  overviews: Record<ContentLocale, string>;
-  flyingContext: Record<ContentLocale, string>;
-  seasonality: Record<ContentLocale, string>;
+  names: LocalizedText;
+  areas: LocalizedText;
+  shortDescriptions: LocalizedText;
+  overviews: LocalizedText;
+  flyingContext: LocalizedText;
+  seasonality: LocalizedText;
   referenceUrl?: string;
 };
 
@@ -30,12 +38,12 @@ const destination = (
     DestinationRecord,
     "names" | "areas" | "shortDescriptions" | "overviews" | "flyingContext" | "seasonality"
   > & {
-    names: Record<ContentLocale, string>;
-    areas: Record<ContentLocale, string>;
-    shortDescriptions: Record<ContentLocale, string>;
-    overviews: Record<ContentLocale, string>;
-    flyingContext: Record<ContentLocale, string>;
-    seasonality: Record<ContentLocale, string>;
+    names: LocalizedText;
+    areas: LocalizedText;
+    shortDescriptions: LocalizedText;
+    overviews: LocalizedText;
+    flyingContext: LocalizedText;
+    seasonality: LocalizedText;
   },
 ): DestinationRecord => partial;
 
@@ -552,6 +560,7 @@ export const DESTINATIONS: DestinationRecord[] = [
       ro: "Mai–septembrie este tipic; confirmă mereu ghidarea clubului local.",
     },
   }),
+  ...COUNTRY_DESTINATIONS,
 ];
 
 const bySlug = new Map(DESTINATIONS.map((d) => [d.slug, d]));
@@ -566,39 +575,15 @@ export function getDestinationById(id: string): DestinationRecord | undefined {
 }
 
 export function destinationPath(slug: string, locale: ContentLocale): string {
-  return locale === "ro" ? `/ro/destinatii/${slug}` : `/destinations/${slug}`;
+  return `${destinationDirectory(locale)}/${slug}`;
 }
 
 export function destinationForecastHref(id: string, locale: ContentLocale): string {
-  const base = locale === "ro" ? "/ro" : "/";
-  return `${base}?site=${encodeURIComponent(id)}`;
+  return `${localeHomePath(locale)}?site=${encodeURIComponent(id)}`;
 }
 
-export const WORLDWIDE_FOOTER_DESTINATION_IDS = [
-  "annecy",
-  "interlaken",
-  "bassano",
-  "oludeniz",
-  "pokhara",
-  "bir-billing",
-  "cape-town",
-  "queenstown",
-  "torrey-pines",
-  "valle-de-bravo",
-  "roldanillo",
-] as const;
-
-export const ROMANIA_FOOTER_DESTINATION_IDS = [
-  "spot-bunloc",
-  "spot-clopotiva",
-  "spot-postavarul",
-  "spot-sirnea",
-  "spot-pralea",
-  "spot-rimetea",
-] as const;
-
 export function footerDestinationsForContentLocale(locale: ContentLocale): DestinationRecord[] {
-  const ids =
-    locale === "ro" ? ROMANIA_FOOTER_DESTINATION_IDS : WORLDWIDE_FOOTER_DESTINATION_IDS;
-  return ids.map((id) => getDestinationById(id)).filter((d): d is DestinationRecord => Boolean(d));
+  return contentLocaleDefinition(locale)
+    .footerDestinationIds.map((id) => getDestinationById(id))
+    .filter((d): d is DestinationRecord => Boolean(d));
 }

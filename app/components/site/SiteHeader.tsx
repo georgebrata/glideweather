@@ -1,23 +1,11 @@
 import Link from "next/link";
+import { PRODUCT_NAME } from "@/app/brand";
+import { chromeFor } from "@/app/seo/chrome";
 import { pathForRoute } from "@/app/seo/routes";
 import type { ContentLocale } from "@/app/seo/types";
-import { PRODUCT_NAME } from "@/app/brand";
-
-const navLabels: Record<ContentLocale, { console: string; guides: string; destinations: string }> = {
-  en: {
-    console: "Flight console",
-    guides: "Guides",
-    destinations: "Destinations",
-  },
-  ro: {
-    console: "Consolă zbor",
-    guides: "Ghiduri",
-    destinations: "Destinații",
-  },
-};
 
 export const SiteHeader = ({ locale }: { locale: ContentLocale }) => {
-  const labels = navLabels[locale];
+  const labels = chromeFor(locale);
   const home = pathForRoute("home", locale);
 
   return (
@@ -26,7 +14,7 @@ export const SiteHeader = ({ locale }: { locale: ContentLocale }) => {
         <Link href={home} className="text-lg font-semibold tracking-tight text-foreground">
           {PRODUCT_NAME}
         </Link>
-        <nav aria-label={locale === "ro" ? "Navigare principală" : "Primary"} className="flex flex-wrap gap-4 text-sm">
+        <nav aria-label={labels.navAria} className="flex flex-wrap gap-4 text-sm">
           <Link href={home} className="text-muted-foreground hover:text-foreground">
             {labels.console}
           </Link>

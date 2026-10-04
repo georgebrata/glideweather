@@ -231,3 +231,38 @@
 .light .frosted-chip {
   background: rgba(247, 251, 248, 0.88);
 }
+
+/* Clerk account menu follows the active theme tokens. */
+.cl-userButtonPopoverCard,
+.cl-userButtonPopoverMain {
+  background-color: var(--card) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
+}
+
+.cl-userButtonPopoverActionButton,
+.cl-userButtonPopoverCustomItemButton,
+.cl-userPreviewMainIdentifier,
+.cl-userPreviewMainIdentifierText,
+.cl-userButtonPopoverActionButtonIcon,
+.cl-userButtonPopoverActionItemButtonIcon,
+.cl-userButtonPopoverActionButton svg,
+.cl-userButtonPopoverCustomItemButton svg {
+  color: var(--foreground) !important;
+}
+
+.cl-userPreviewSecondaryIdentifier,
+.cl-userButtonPopoverFooter,
+.cl-userButtonPopoverFooterPagesLink {
+  color: var(--muted-foreground) !important;
+}
+
+.cl-userButtonPopoverActionButton:hover,
+.cl-userButtonPopoverActionButton:focus,
+.cl-userButtonPopoverActionButton:focus-visible,
+.cl-userButtonPopoverCustomItemButton:hover,
+.cl-userButtonPopoverCustomItemButton:focus,
+.cl-userButtonPopoverCustomItemButton:focus-visible {
+  background-color: var(--accent-ui) !important;
+  color: var(--foreground) !important;
+}

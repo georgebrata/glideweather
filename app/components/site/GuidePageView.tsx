@@ -1,32 +1,10 @@
 import Link from "next/link";
 import { CONTENT_LAST_UPDATED, getGuideContent, getGuideCopy } from "@/app/content/guides";
 import { breadcrumbJsonLd, faqPageJsonLd, JsonLd, webPageJsonLd } from "@/app/seo/jsonld";
+import { chromeFor } from "@/app/seo/chrome";
 import { getGuideRoute, pathForRoute } from "@/app/seo/routes";
 import type { ContentLocale, GuideRouteKey } from "@/app/seo/types";
 import { ContentPageShell } from "./ContentPageShell";
-
-const relatedLabels: Record<ContentLocale, Record<GuideRouteKey, string>> = {
-  en: {
-    about: "About GlideWeather",
-    howItWorks: "How GlideWeather works",
-    paraglidingWeather: "Paragliding weather guide",
-    whenToFly: "When to check conditions",
-    flightWindow: "Flight window explained",
-    faq: "FAQ",
-    destinationsHub: "Destinations",
-    home: "Home",
-  },
-  ro: {
-    about: "Despre GlideWeather",
-    howItWorks: "Cum funcționează GlideWeather",
-    paraglidingWeather: "Ghid meteo parapantă",
-    whenToFly: "Când să verifici condițiile",
-    flightWindow: "Fereastra de zbor explicată",
-    faq: "Întrebări frecvente",
-    destinationsHub: "Destinații",
-    home: "Acasă",
-  },
-};
 
 export const GuidePageView = ({
   locale,
@@ -40,7 +18,8 @@ export const GuidePageView = ({
   const content = getGuideContent(locale, routeKey);
   const copy = getGuideCopy(locale);
   const homePath = pathForRoute("home", locale);
-  const homeLabel = relatedLabels[locale].home;
+  const chrome = chromeFor(locale);
+  const homeLabel = chrome.home;
 
   const jsonLd: Record<string, unknown>[] = [
     webPageJsonLd(locale, path, content.h1, content.lead),
@@ -90,13 +69,13 @@ export const GuidePageView = ({
 
         <aside className="mt-12 rounded-2xl border border-[var(--border-flight)] bg-card p-6">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            {locale === "ro" ? "Continuă lectura" : "Continue reading"}
+            {chrome.continueReading}
           </h2>
           <ul className="mt-3 flex flex-col gap-2 text-sm">
             {content.related.map((key) => (
               <li key={key}>
                 <Link href={pathForRoute(key, locale)} className="text-primary hover:underline">
-                  {relatedLabels[locale][key]}
+                  {chrome.related[key]}
                 </Link>
               </li>
             ))}

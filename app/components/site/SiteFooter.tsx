@@ -1,44 +1,13 @@
 import Link from "next/link";
-import { getGuideCopy } from "@/app/content/guides";
-import { footerDestinationsForContentLocale } from "@/app/content/destinations";
-import { destinationPath } from "@/app/content/destinations";
-import { GUIDE_ROUTE_KEYS, pathForRoute, alternatePath } from "@/app/seo/routes";
-import type { ContentLocale } from "@/app/seo/types";
 import { PRODUCT_NAME } from "@/app/brand";
-
-const guideLabels: Record<ContentLocale, Record<string, string>> = {
-  en: {
-    about: "About GlideWeather",
-    howItWorks: "How it works",
-    paraglidingWeather: "Paragliding weather",
-    whenToFly: "When to fly",
-    flightWindow: "Flight window",
-    faq: "FAQ",
-    destinationsHub: "All destinations",
-  },
-  ro: {
-    about: "Despre GlideWeather",
-    howItWorks: "Cum funcționează",
-    paraglidingWeather: "Meteo parapantă",
-    whenToFly: "Când să zbori",
-    flightWindow: "Fereastra de zbor",
-    faq: "Întrebări frecvente",
-    destinationsHub: "Toate destinațiile",
-  },
-};
-
-const sectionLabels: Record<ContentLocale, { product: string; destinations: string; language: string }> = {
-  en: {
-    product: PRODUCT_NAME,
-    destinations: "Popular paragliding destinations",
-    language: "Language",
-  },
-  ro: {
-    product: PRODUCT_NAME,
-    destinations: "Destinații populare parapantă",
-    language: "Limbă",
-  },
-};
+import { getGuideCopy } from "@/app/content/guides";
+import { destinationPath, footerDestinationsForContentLocale, localizedText } from "@/app/content/destinations";
+import { CONTENT_LOCALES } from "../../../content-locales";
+import { FEEDBACK_PAGE } from "@/app/content/feedback";
+import { contentLocaleDefinition } from "../../../content-locales";
+import { chromeFor } from "@/app/seo/chrome";
+import { alternatePath, GUIDE_ROUTE_KEYS, pathForRoute } from "@/app/seo/routes";
+import type { ContentLocale } from "@/app/seo/types";
 
 export const SiteFooter = ({
   locale,
@@ -49,33 +18,36 @@ export const SiteFooter = ({
 }) => {
   const copy = getGuideCopy(locale);
   const destinations = footerDestinationsForContentLocale(locale);
-  const labels = sectionLabels[locale];
-  const enPath = alternatePath(currentPath, "en") ?? "/";
-  const roPath = alternatePath(currentPath, "ro") ?? "/ro";
+  const labels = chromeFor(locale);
 
   return (
     <footer className="border-t border-[var(--border-flight)] bg-card/40">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-10 md:grid-cols-2 lg:grid-cols-4 md:px-6">
-        <nav aria-label={labels.product}>
-          <h2 className="mb-3 text-sm font-semibold text-foreground">{labels.product}</h2>
+        <nav aria-label={PRODUCT_NAME}>
+          <h2 className="mb-3 text-sm font-semibold text-foreground">{PRODUCT_NAME}</h2>
           <ul className="flex flex-col gap-2 text-sm text-muted-foreground">
             {GUIDE_ROUTE_KEYS.map((key) => (
               <li key={key}>
                 <Link href={pathForRoute(key, locale)} className="hover:text-foreground">
-                  {guideLabels[locale][key]}
+                  {labels.guideLabels[key]}
                 </Link>
               </li>
             ))}
             <li>
               <Link href={pathForRoute("destinationsHub", locale)} className="hover:text-foreground">
-                {guideLabels[locale].destinationsHub}
+                {labels.allDestinations}
+              </Link>
+            </li>
+            <li>
+              <Link href={pathForRoute("feedback", locale)} className="hover:text-foreground">
+                {FEEDBACK_PAGE[contentLocaleDefinition(locale).copy].nav}
               </Link>
             </li>
           </ul>
         </nav>
 
-        <nav aria-label={labels.destinations}>
-          <h2 className="mb-3 text-sm font-semibold text-foreground">{labels.destinations}</h2>
+        <nav aria-label={labels.popularDestinations}>
+          <h2 className="mb-3 text-sm font-semibold text-foreground">{labels.popularDestinations}</h2>
           <ul className="flex flex-col gap-2 text-sm text-muted-foreground">
             {destinations.map((destination) => (
               <li key={destination.id}>
@@ -84,7 +56,7 @@ export const SiteFooter = ({
                   prefetch={false}
                   className="hover:text-foreground"
                 >
-                  {destination.names[locale]}
+                  {localizedText(destination.names, locale)}
                 </Link>
               </li>
             ))}
@@ -94,24 +66,21 @@ export const SiteFooter = ({
         <nav aria-label={labels.language}>
           <h2 className="mb-3 text-sm font-semibold text-foreground">{labels.language}</h2>
           <ul className="flex flex-col gap-2 text-sm">
-            <li>
-              <Link
-                href={enPath}
-                hrefLang="en"
-                className={locale === "en" ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground"}
-              >
-                English
-              </Link>
-            </li>
-            <li>
-              <Link
-                href={roPath}
-                hrefLang="ro"
-                className={locale === "ro" ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground"}
-              >
-                Română
-              </Link>
-            </li>
+            {CONTENT_LOCALES.map((entry) => {
+              const href = alternatePath(currentPath, entry.id) ?? pathForRoute("home", entry.id);
+              const current = entry.id === locale;
+              return (
+                <li key={entry.id}>
+                  <Link
+                    href={href}
+                    hrefLang={entry.hreflang}
+                    className={current ? "font-medium text-foreground" : "text-muted-foreground hover:text-foreground"}
+                  >
+                    {entry.nativeName}
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </nav>
 

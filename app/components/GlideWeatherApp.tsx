@@ -360,11 +360,7 @@ function FlightWindowDashboard({
 
   const attributionFallback =
     providerLabel != null
-      ? `${t.header.productChip} · ${providerLabel} · ${
-          contentLocale === "ro"
-            ? "Ajutor la decizie, nu autorizare de zbor."
-            : "Decision aid, not flight authorization."
-        }`
+      ? `${t.header.productChip} · ${providerLabel} · ${t.decision.disclaimer}`
       : t.flightWindow.footerAttribution;
 
   return (

@@ -1,13 +1,15 @@
 import { z } from "zod";
 
-const WindGridSchema = z.object({
-  latitude: z.array(z.number()),
-  longitude: z.array(z.number()),
+const WindLocationSchema = z.object({
+  latitude: z.number(),
+  longitude: z.number(),
   current: z.object({
-    wind_speed_10m: z.array(z.number().nullable()),
-    wind_direction_10m: z.array(z.number().nullable()),
+    wind_speed_10m: z.number().nullable(),
+    wind_direction_10m: z.number().nullable(),
   }),
 });
+
+const WindGridSchema = z.union([WindLocationSchema, z.array(WindLocationSchema)]);
 
 export type WindGridPoint = {
   latitude: number;
@@ -15,6 +17,19 @@ export type WindGridPoint = {
   speed: number | null;
   direction: number | null;
 };
+
+export function windPointsFromResponse(payload: unknown): WindGridPoint[] {
+  const parsed = WindGridSchema.safeParse(payload);
+  if (!parsed.success) return [];
+
+  const locations = Array.isArray(parsed.data) ? parsed.data : [parsed.data];
+  return locations.map((point) => ({
+    latitude: point.latitude,
+    longitude: point.longitude,
+    speed: point.current.wind_speed_10m,
+    direction: point.current.wind_direction_10m,
+  }));
+}
 
 export async function fetchWindGrid(
   latitude: number,
@@ -42,14 +57,11 @@ export async function fetchWindGrid(
     wind_speed_unit: "kmh",
   });
 
-  const response = await fetch(`https://api.open-meteo.com/v1/forecast?${search.toString()}`);
-  if (!response.ok) return [];
-
-  const data = WindGridSchema.parse(await response.json());
-  return data.latitude.map((lat, index) => ({
-    latitude: lat,
-    longitude: data.longitude[index] ?? longitude,
-    speed: data.current.wind_speed_10m[index] ?? null,
-    direction: data.current.wind_direction_10m[index] ?? null,
-  }));
+  try {
+    const response = await fetch(`https://api.open-meteo.com/v1/forecast?${search.toString()}`);
+    if (!response.ok) return [];
+    return windPointsFromResponse(await response.json());
+  } catch {
+    return [];
+  }
 }

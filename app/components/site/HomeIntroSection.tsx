@@ -1,31 +1,12 @@
 import Link from "next/link";
 import { getGuideCopy } from "@/app/content/guides";
+import { chromeFor } from "@/app/seo/chrome";
 import { GUIDE_ROUTE_KEYS, pathForRoute } from "@/app/seo/routes";
 import type { ContentLocale } from "@/app/seo/types";
 
-const linkLabels: Record<ContentLocale, Record<string, string>> = {
-  en: {
-    about: "Learn what GlideWeather is and who it serves",
-    howItWorks: "See how location data becomes a flight window",
-    paraglidingWeather: "Understand paragliding wind and instability signals",
-    whenToFly: "Know when to check conditions before travelling",
-    flightWindow: "Learn how GlideWeather evaluates a flight window",
-    faq: "Read paragliding weather FAQ",
-    destinationsHub: "Explore popular paragliding destinations",
-  },
-  ro: {
-    about: "Află ce este GlideWeather și pentru cine este",
-    howItWorks: "Vezi cum locația devine fereastră de zbor",
-    paraglidingWeather: "Înțelege semnalele de vânt și instabilitate",
-    whenToFly: "Când să verifici condițiile înainte de drum",
-    flightWindow: "Cum evaluează GlideWeather fereastra de zbor",
-    faq: "Întrebări frecvente meteo parapantă",
-    destinationsHub: "Explorează destinații populare de parapantă",
-  },
-};
-
 export const HomeIntroSection = ({ locale }: { locale: ContentLocale }) => {
   const intro = getGuideCopy(locale).homeIntro;
+  const chrome = chromeFor(locale);
 
   return (
     <section
@@ -41,18 +22,18 @@ export const HomeIntroSection = ({ locale }: { locale: ContentLocale }) => {
             {paragraph}
           </p>
         ))}
-        <nav aria-label={locale === "ro" ? "Ghiduri GlideWeather" : "GlideWeather guides"} className="mt-6">
+        <nav aria-label={chrome.introNavAria} className="mt-6">
           <ul className="flex flex-col gap-2 text-sm">
             {GUIDE_ROUTE_KEYS.map((key) => (
               <li key={key}>
                 <Link href={pathForRoute(key, locale)} className="text-primary hover:underline">
-                  {linkLabels[locale][key]}
+                  {chrome.introLinks[key]}
                 </Link>
               </li>
             ))}
             <li>
               <Link href={pathForRoute("destinationsHub", locale)} className="text-primary hover:underline">
-                {linkLabels[locale].destinationsHub}
+                {chrome.introLinks.destinationsHub}
               </Link>
             </li>
           </ul>

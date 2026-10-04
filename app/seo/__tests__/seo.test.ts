@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  DESTINATIONS,
-  footerDestinationsForContentLocale,
-  ROMANIA_FOOTER_DESTINATION_IDS,
-  WORLDWIDE_FOOTER_DESTINATION_IDS,
-} from "../../content/destinations";
+import { DESTINATIONS, footerDestinationsForContentLocale } from "../../content/destinations";
+import { CONTENT_LOCALES, contentLocaleDefinition } from "../../../content-locales";
 import { getGuideCopy } from "../../content/guides";
 import {
   INDEXABLE_STATIC_ROUTES,
@@ -15,6 +11,7 @@ import {
 } from "../routes";
 import { buildPageMetadata } from "../metadata";
 import { hreflangCode } from "../locale";
+import { homeJsonLd, jsonLdDocument } from "../jsonld";
 
 describe("SEO route registry", () => {
   it("indexable routes have distinct en and ro paths", () => {
@@ -30,6 +27,13 @@ describe("SEO route registry", () => {
     assert.deepEqual(resolveRouteFromPath("/destinations/annecy"), {
       key: "destination",
       locale: "en",
+    });
+    assert.deepEqual(resolveRouteFromPath("/feedback"), { key: "feedback", locale: "en" });
+    assert.deepEqual(resolveRouteFromPath("/ro/pareri"), { key: "feedback", locale: "ro" });
+    assert.deepEqual(resolveRouteFromPath("/de/ueber-uns"), { key: "about", locale: "de" });
+    assert.deepEqual(resolveRouteFromPath("/at/fluggebiete/emberger-alm"), {
+      key: "destination",
+      locale: "at",
     });
   });
 
@@ -54,22 +58,16 @@ describe("SEO route registry", () => {
 });
 
 describe("destination footer sets", () => {
-  it("worldwide set spans multiple regions", () => {
-    const items = footerDestinationsForContentLocale("en");
-    const regions = new Set(items.map((d) => d.region));
-    assert.ok(regions.has("europe"));
-    assert.ok(regions.has("asia"));
-    assert.ok(regions.has("africa"));
-    assert.ok(regions.has("oceania"));
-    assert.ok(regions.has("northAmerica"));
-    assert.ok(regions.has("southAmerica"));
-    assert.equal(items.length, WORLDWIDE_FOOTER_DESTINATION_IDS.length);
-  });
-
-  it("romanian locale uses Romania-focused footer", () => {
-    const items = footerDestinationsForContentLocale("ro");
-    assert.equal(items.length, ROMANIA_FOOTER_DESTINATION_IDS.length);
-    assert.ok(items.every((d) => d.region === "romania"));
+  it("every content locale footer lists six sites", () => {
+    for (const entry of CONTENT_LOCALES) {
+      const items = footerDestinationsForContentLocale(entry.id);
+      assert.equal(items.length, 6, entry.id);
+      assert.equal(items.length, contentLocaleDefinition(entry.id).footerDestinationIds.length);
+    }
+    assert.ok(footerDestinationsForContentLocale("en").some((item) => item.id === "long-mynd"));
+    assert.ok(footerDestinationsForContentLocale("ro").every((item) => item.region === "romania"));
+    assert.ok(footerDestinationsForContentLocale("de").every((item) => item.countryCode === "DE"));
+    assert.ok(footerDestinationsForContentLocale("ie").every((item) => item.countryCode === "IE"));
   });
 });
 

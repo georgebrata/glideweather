@@ -1,8 +1,6 @@
 import { SignUp } from "@clerk/nextjs";
 import { redirect } from "next/navigation";
 import { authEnabled } from "@/flags";
-import { glideClerkAppearance } from "@/app/lib/clerkAppearance";
-
 export default async function SignUpPage() {
   const authOn = await authEnabled();
   if (!authOn) {
@@ -11,7 +9,7 @@ export default async function SignUpPage() {
 
   return (
     <div className="nocturne-canvas flex min-h-screen items-center justify-center p-4">
-      <SignUp appearance={glideClerkAppearance} />
+      <SignUp />
     </div>
   );
 }

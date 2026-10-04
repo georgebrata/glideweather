@@ -38,7 +38,7 @@ test.describe("SEO surfaces", () => {
     const ro = await request.get("/ro", { headers: htmlHeaders });
     const enHtml = await en.text();
     const roHtml = await ro.text();
-    expect(enHtml).toContain('href="/destinations/annecy"');
+    expect(enHtml).toContain('href="/destinations/long-mynd"');
     expect(roHtml).toContain('href="/ro/destinatii/bunloc"');
   });
 

@@ -1,4 +1,7 @@
-import type { ContentLocale } from "../seo/types";
+import { contentLocaleDefinition, type ContentLocale, type CopyLocale } from "../../content-locales";
+import { extraGuides } from "./extraGuides";
+import { moreGuides } from "./moreGuides";
+import { restGuides } from "./restGuides";
 import type { GuideRouteKey } from "../seo/types";
 
 export type GuideSection = {
@@ -547,13 +550,17 @@ export type GuideCopyBundle = {
   destinationsHub: GuideContent;
 };
 
-const bundles: Record<ContentLocale, GuideCopyBundle> = {
+const bundles: Partial<Record<CopyLocale, GuideCopyBundle>> = {
   en,
   ro: roFull,
+  ...extraGuides,
+  ...moreGuides,
+  ...restGuides,
 };
 
 export function getGuideCopy(locale: ContentLocale): GuideCopyBundle {
-  return bundles[locale];
+  const copy = contentLocaleDefinition(locale).copy;
+  return bundles[copy] ?? en;
 }
 
 export function getGuideContent(locale: ContentLocale, key: GuideRouteKey): GuideContent {

@@ -1,4 +1,4 @@
-import { getDestinationById } from "../content/destinations";
+import { getDestinationById, localizedText } from "../content/destinations";
 import type { ContentLocale } from "../seo/types";
 import type { LocationChoice } from "./weather";
 
@@ -10,8 +10,8 @@ export function destinationToLocationChoice(
   if (!destination) return null;
   return {
     id: destination.id,
-    name: destination.names[contentLocale],
-    detail: destination.areas[contentLocale],
+    name: localizedText(destination.names, contentLocale),
+    detail: localizedText(destination.areas, contentLocale),
     latitude: destination.latitude,
     longitude: destination.longitude,
     source: "search",

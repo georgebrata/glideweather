@@ -1,6 +1,7 @@
 import { INDEXABLE_STATIC_ROUTES, pathForRoute } from "../seo/routes";
 import { DESTINATIONS } from "../content/destinations";
 import { resolveSiteOrigin } from "../brand";
+import { CONTENT_LOCALES } from "../../content-locales";
 
 export function GET() {
   const origin = resolveSiteOrigin();
@@ -11,10 +12,9 @@ export function GET() {
     "",
     "## Primary pages",
     "",
-    ...INDEXABLE_STATIC_ROUTES.flatMap((route) => [
-      `- ${origin}${route.paths.en}`,
-      `- ${origin}${route.paths.ro}`,
-    ]),
+    ...INDEXABLE_STATIC_ROUTES.flatMap((route) =>
+      CONTENT_LOCALES.map((entry) => `- ${origin}${route.paths[entry.id]}`),
+    ),
     "",
     "## Destinations",
     "",
@@ -22,8 +22,9 @@ export function GET() {
       (d) => `- ${origin}/destinations/${d.slug} — ${d.names.en}`,
     ),
     "",
-    `Home (English): ${origin}${pathForRoute("home", "en")}`,
-    `Home (Romanian): ${origin}${pathForRoute("home", "ro")}`,
+    ...CONTENT_LOCALES.map(
+      (entry) => `Home (${entry.nativeName}): ${origin}${pathForRoute("home", entry.id)}`,
+    ),
     "",
   ];
 

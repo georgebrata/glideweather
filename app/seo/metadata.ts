@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { MARK_SRC, PRODUCT_NAME, resolveSiteOrigin } from "../brand";
-import { hreflangCode } from "./locale";
-import { getRoute, pathForRoute, type RouteDefinition } from "./routes";
+import { CONTENT_LOCALES } from "../../content-locales";
+import { hreflangCode, openGraphLocale } from "./locale";
+import { destinationDirectory, getRoute, pathForRoute, type RouteDefinition } from "./routes";
 import type { ContentLocale, StaticRouteKey } from "./types";
 
 const siteOrigin = resolveSiteOrigin();
@@ -11,12 +12,13 @@ export type PageMetadataOptions = {
   canonicalPath?: string;
 };
 
-export function buildAlternates(route: RouteDefinition, locale: ContentLocale, canonicalPath: string) {
+export function buildAlternates(route: RouteDefinition, _locale: ContentLocale, canonicalPath: string) {
   const languages: Record<string, string> = {
-    [hreflangCode("en")]: route.paths.en,
-    [hreflangCode("ro")]: route.paths.ro,
     "x-default": route.paths.en,
   };
+  for (const entry of CONTENT_LOCALES) {
+    languages[hreflangCode(entry.id)] = route.paths[entry.id];
+  }
   return {
     canonical: canonicalPath,
     languages,
@@ -50,7 +52,7 @@ export function buildPageMetadata(
     openGraph: {
       type: "website",
       siteName: PRODUCT_NAME,
-      locale: locale === "ro" ? "ro_RO" : "en_GB",
+      locale: openGraphLocale(locale),
       url,
       title,
       description,
@@ -69,13 +71,13 @@ export function buildDestinationMetadata(
   title: string,
   description: string,
 ): Metadata {
-  const canonicalPath =
-    locale === "ro" ? `/ro/destinatii/${slug}` : `/destinations/${slug}`;
+  const canonicalPath = `${destinationDirectory(locale)}/${slug}`;
   const languages: Record<string, string> = {
-    en: `/destinations/${slug}`,
-    ro: `/ro/destinatii/${slug}`,
-    "x-default": `/destinations/${slug}`,
+    "x-default": `${destinationDirectory("en")}/${slug}`,
   };
+  for (const entry of CONTENT_LOCALES) {
+    languages[hreflangCode(entry.id)] = `${destinationDirectory(entry.id)}/${slug}`;
+  }
 
   return {
     metadataBase: new URL(siteOrigin),
@@ -92,7 +94,7 @@ export function buildDestinationMetadata(
     openGraph: {
       type: "website",
       siteName: PRODUCT_NAME,
-      locale: locale === "ro" ? "ro_RO" : "en_GB",
+      locale: openGraphLocale(locale),
       url: new URL(canonicalPath, siteOrigin).toString(),
       title,
       description,

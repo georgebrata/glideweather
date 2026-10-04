@@ -1,19 +1,25 @@
+import {
+  CONTENT_LOCALES,
+  contentLocaleFromPathname as localeFromPath,
+  localeHomePath,
+  type ContentLocale,
+} from "./content-locales";
+
 export const CONTENT_LOCALE_HEADER = "x-content-locale";
 
 export const CONTENT_LOCALE_COOKIE = "gw-content-locale";
 
-export type ProxyContentLocale = "en" | "ro";
+export type ProxyContentLocale = ContentLocale;
 
 export function contentLocaleFromPathname(pathname: string): ProxyContentLocale {
-  if (pathname === "/ro" || pathname.startsWith("/ro/")) {
-    return "ro";
-  }
-  return "en";
+  return localeFromPath(pathname);
 }
+
+const clerkHomePaths = new Set(CONTENT_LOCALES.map((entry) => localeHomePath(entry.id)));
 
 /** Routes that run Clerk middleware when auth is enabled (console, auth UI, profile). */
 export function isClerkScopedPath(pathname: string): boolean {
-  if (pathname === "/" || pathname === "/ro") {
+  if (clerkHomePaths.has(pathname)) {
     return true;
   }
   if (
