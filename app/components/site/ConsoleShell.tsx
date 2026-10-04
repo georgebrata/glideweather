@@ -26,6 +26,11 @@ export const ConsoleShell = ({
         data-utcoffset="2"
         strategy="afterInteractive"
       />
+      <Script
+        src="https://analytics.ahrefs.com/analytics.js"
+        data-key="Huz8sZKlVbng/HbN9NkE7A"
+        strategy="afterInteractive"
+      />
       {children}
       {intro}
       {footer ?? <SiteFooter locale={locale} currentPath={currentPath} />}
